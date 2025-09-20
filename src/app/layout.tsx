@@ -43,12 +43,6 @@ export default function RootLayout({
               >
                 Library
               </Link>
-              <Link
-                href="/search"
-                className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Search
-              </Link>
             </div>
           </div>
         </nav>

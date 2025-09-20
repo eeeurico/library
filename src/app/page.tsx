@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import EditBookModal from "@/components/EditBookModal"
 import AddBookModal from "@/components/AddBookModal"
+import SearchBooksModal from "@/components/SearchBooksModal"
 
 type Book = {
   id?: string
@@ -29,6 +30,7 @@ export default function BooksPage() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [searchModalOpen, setSearchModalOpen] = useState(false)
 
   // Initialize view mode from localStorage
   useEffect(() => {
@@ -231,6 +233,21 @@ export default function BooksPage() {
     }
   }
 
+  const handleBookAdded = async () => {
+    // Refresh the book list when a book is added from search
+    try {
+      const res = await fetch("/api/books")
+      const data = await res.json()
+      setBooks(data)
+
+      // Update cache
+      localStorage.setItem("bookLibrary_books", JSON.stringify(data))
+      localStorage.setItem("bookLibrary_books_timestamp", Date.now().toString())
+    } catch (error) {
+      console.error("Error refreshing books:", error)
+    }
+  }
+
   const handleFetchPrice = async (book: Book) => {
     if (!book.isbn || !book.title) return
 
@@ -299,12 +316,12 @@ export default function BooksPage() {
             </div>
           )}
           <div className="flex items-center space-x-3">
-            <a
-              href="/search"
+            <button
+              onClick={() => setSearchModalOpen(true)}
               className="px-4 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
             >
               Search Books
-            </a>
+            </button>
             <button
               onClick={() => setAddModalOpen(true)}
               className="px-4 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
@@ -353,12 +370,12 @@ export default function BooksPage() {
             Start building your collection
           </p>
           <div className="flex items-center justify-center space-x-4">
-            <a
-              href="/search"
+            <button
+              onClick={() => setSearchModalOpen(true)}
               className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
             >
               Search Books
-            </a>
+            </button>
             <button
               onClick={() => setAddModalOpen(true)}
               className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
@@ -397,6 +414,13 @@ export default function BooksPage() {
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSave={handleManualAdd}
+      />
+
+      {/* Search Books Modal */}
+      <SearchBooksModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onBookAdded={handleBookAdded}
       />
     </div>
   )
