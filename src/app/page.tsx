@@ -313,9 +313,9 @@ export default function BooksPage() {
   }
 
   return (
-    <div>
+    <>
       {/* Header with view controls */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8 px-6">
         <div>
           <h1 className="text-4xl font-light tracking-tight text-foreground">
             BookLibrary
@@ -508,7 +508,7 @@ export default function BooksPage() {
           </svg>
         </button>
       )}
-    </div>
+    </>
   )
 }
 
@@ -524,7 +524,7 @@ function GridView({
   isAuthenticated: boolean
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 px-6">
       {books.map((book) => (
         <div key={book.rowIndex} className="group">
           <div className="relative aspect-[3/4] mb-3">
@@ -615,51 +615,51 @@ function TableView({
   isAuthenticated: boolean
 }) {
   return (
-    <div className="w-full">
-      <table className="w-full">
+    <div className="w-full overflow-x-auto px-6">
+      <table className="w-full min-w-[1200px]">
         <thead>
           <tr className="border-b border-border">
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[60px]">
               Cover
             </th>
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[200px]">
               Title
             </th>
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[150px]">
               Author
             </th>
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
               Publisher
             </th>
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[80px]">
               Year
             </th>
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
               ISBN
             </th>
             {isAuthenticated && (
-              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Price
               </th>
             )}
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
               Language
             </th>
             {isAuthenticated && (
-              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Selling Price
               </th>
             )}
             {isAuthenticated && (
-              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Not for Sale
               </th>
             )}
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[80px]">
               Link
             </th>
             {isAuthenticated && (
-              <th className="text-right py-4 px-2 font-normal text-sm text-muted-foreground">
+              <th className="text-right py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
                 Actions
               </th>
             )}
