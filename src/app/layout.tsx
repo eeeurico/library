@@ -28,24 +28,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased`}
       >
-        <nav className="border-b border-border/50">
-          <div className="w-full px-6 flex h-16 items-center">
-            <Link
-              href="/"
-              className="text-2xl font-light tracking-tight text-foreground"
-            >
-              BookLibrary
-            </Link>
-            <div className="ml-auto flex items-center space-x-8">
-              <Link
-                href="/"
-                className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Library
-              </Link>
-            </div>
-          </div>
-        </nav>
         <main className="flex-1">
           <div className="w-full px-6 py-8">{children}</div>
         </main>
