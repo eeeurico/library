@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       values = bookData.values
     } else {
       // New format - convert book object to values array
-      // Adjust this array order to match your Google Sheet columns
+      // Order matches your Google Sheet headers: id, isbn, title, author, type, publisher, year, edition, coverUrl, notes, price, url
       values = [
         "", // ID (auto-generated or empty)
         bookData.isbn || "",
@@ -22,10 +22,11 @@ export async function POST(req: Request) {
         bookData.type || "book",
         bookData.publisher || "",
         bookData.year || "",
+        bookData.edition || "",
         bookData.coverUrl || "",
         bookData.notes || "",
         bookData.price || "",
-        bookData.status || "available",
+        bookData.url || "",
       ]
     }
 

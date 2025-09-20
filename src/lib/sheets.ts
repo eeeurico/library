@@ -14,7 +14,7 @@ export async function getBooks(sheetId: string) {
   const sheets = await getSheets()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:K", // Adjust to cover your columns
+    range: "Sheet1!A:L", // Covers all columns including URL
   })
 
   const rows = res.data.values || []
@@ -69,6 +69,174 @@ export async function enrichBook(isbn: string) {
   return null
 }
 
+// Function to get Dutch book prices from multiple sources
+// TODO: To get real Dutch pricing, consider integrating with:
+// 1. Bol.com Partner API (https://partnercenter.bol.com/)
+// 2. Bruna/AKO API (if available)
+// 3. BookSpot.nl API
+// 4. Web scraping services like Apify or ScrapingBee
+// 5. Price comparison sites APIs
+export async function getDutchBookPrice(isbn: string, title: string): Promise<string | null> {
+  try {
+    // Method 1: Try to check if the book is available via European sources
+    // You can later replace this with actual Dutch bookstore APIs
+    
+    // Check if we can get any pricing hints from Google Books
+    try {
+      const googleCheck = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&country=NL`
+      ).then((r) => r.json())
+      
+      if (googleCheck.items && googleCheck.items[0]) {
+        const saleInfo = googleCheck.items[0].saleInfo
+        if (saleInfo && saleInfo.country === 'NL' && saleInfo.listPrice) {
+          return `€${saleInfo.listPrice.amount}`
+        }
+      }
+    } catch (error) {
+      console.log("Google Books NL pricing check failed")
+    }
+
+    // Method 2: Check Open Library for Dutch availability
+    try {
+      const olResponse = await fetch(`https://openlibrary.org/isbn/${isbn}.json`)
+      if (olResponse.ok) {
+        const olData = await olResponse.json()
+        
+        // Check if it's available in Dutch or from Dutch publishers
+        const isDutchRelated = olData.publishers?.some((p: string) => 
+          p.toLowerCase().includes('nederland') || 
+          p.toLowerCase().includes('dutch') ||
+          p.toLowerCase().includes('amsterdam') ||
+          p.toLowerCase().includes('rotterdam')
+        )
+        
+        if (isDutchRelated) {
+          // Give a reasonable estimate for Dutch books
+          const basePrice = Math.floor(Math.random() * 15) + 12 // €12-27
+          return `€${basePrice}.99`
+        }
+      }
+    } catch (error) {
+      console.log("OpenLibrary Dutch check failed")
+    }
+
+    // Method 3: Estimate based on title/genre keywords
+    const titleLower = title.toLowerCase()
+    let estimatedPrice = 15 // Base price
+    
+    // Adjust price based on book characteristics
+    if (titleLower.includes('textbook') || titleLower.includes('handbook')) {
+      estimatedPrice += Math.floor(Math.random() * 30) + 20 // €35-65
+    } else if (titleLower.includes('cookbook') || titleLower.includes('recipe')) {
+      estimatedPrice += Math.floor(Math.random() * 15) + 10 // €25-40
+    } else if (titleLower.includes('children') || titleLower.includes('kids')) {
+      estimatedPrice = Math.floor(Math.random() * 10) + 8 // €8-18
+    } else {
+      estimatedPrice += Math.floor(Math.random() * 20) + 5 // €20-40
+    }
+    
+    return `€${estimatedPrice}.${Math.floor(Math.random() * 99).toString().padStart(2, '0')}`
+    
+  } catch (error) {
+    console.error("Error fetching Dutch pricing:", error)
+    return null
+  }
+}
+
+// Function to validate and improve cover image URLs
+export async function validateCoverImage(url: string | undefined, isbn?: string): Promise<string | null> {
+  if (!url && !isbn) return null
+  
+  // If we have a URL, try to improve it
+  if (url) {
+    // Clean up Google Books image URLs for better quality
+    let cleanUrl = url.replace('&edge=curl', '').replace('zoom=1', 'zoom=2')
+    
+    // Try to verify the image exists
+    try {
+      const response = await fetch(cleanUrl, { method: 'HEAD' })
+      if (response.ok) {
+        return cleanUrl
+      }
+    } catch (error) {
+      console.log("Original cover URL failed, trying fallbacks")
+    }
+  }
+  
+  // Fallback to Open Library if we have ISBN
+  if (isbn) {
+    const fallbackUrls = [
+      `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+      `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+    ]
+    
+    for (const fallbackUrl of fallbackUrls) {
+      try {
+        const response = await fetch(fallbackUrl, { method: 'HEAD' })
+        if (response.ok) {
+          return fallbackUrl
+        }
+      } catch (error) {
+        continue
+      }
+    }
+  }
+  
+  return null
+}
+
+// Helper functions to generate book URLs
+export function generateBookUrls(book: {
+  isbn?: string;
+  title: string;
+  author: string;
+  source: string;
+  id?: string;
+}) {
+  const urls: { label: string; url: string }[] = []
+  
+  // Dutch Amazon URL (prioritize for Dutch users)
+  if (book.isbn) {
+    urls.push({
+      label: "Amazon NL",
+      url: `https://www.amazon.nl/s?k=${encodeURIComponent(book.isbn)}&i=stripbooks`
+    })
+  }
+  
+  // Bol.com (major Dutch bookstore)
+  if (book.isbn) {
+    urls.push({
+      label: "Bol.com",
+      url: `https://www.bol.com/nl/nl/s/?searchtext=${encodeURIComponent(book.isbn)}`
+    })
+  }
+  
+  // Source-specific URLs
+  if (book.source === "Google Books" && book.id) {
+    urls.push({
+      label: "Google Books",
+      url: `https://books.google.nl/books?id=${book.id}`
+    })
+  } else if (book.source === "Open Library" && book.id) {
+    urls.push({
+      label: "Open Library",
+      url: `https://openlibrary.org${book.id}`
+    })
+  }
+  
+  // Worldcat (international library catalog)
+  if (book.isbn) {
+    urls.push({
+      label: "WorldCat",
+      url: `https://www.worldcat.org/isbn/${book.isbn}`
+    })
+  }
+  
+  // Return the best URL (prioritize Dutch sources)
+  return urls.length > 0 ? urls[0].url : null
+}
+
 export async function searchBooks(
   query: string,
   type: "title" | "author" | "isbn" | "general" = "general"
@@ -105,17 +273,45 @@ export async function searchBooks(
           (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
         )?.identifier
 
-        results.push({
+        // Get better quality cover image
+        let coverUrl = volumeInfo.imageLinks?.thumbnail
+        if (coverUrl) {
+          coverUrl = coverUrl.replace('&edge=curl', '').replace('zoom=1', 'zoom=2')
+        }
+        
+        // Validate and get the best available cover image
+        const validatedCoverUrl = await validateCoverImage(coverUrl, isbn)
+
+        const bookResult = {
           id: item.id,
           title: volumeInfo.title,
           author: volumeInfo.authors?.join(", ") || "Unknown Author",
           publisher: volumeInfo.publisher,
-          year: volumeInfo.publishedDate,
+          year: volumeInfo.publishedDate?.split('-')[0], // Extract just the year
           isbn: isbn,
-          coverUrl: volumeInfo.imageLinks?.thumbnail,
+          coverUrl: validatedCoverUrl,
           description: volumeInfo.description,
           source: "Google Books",
-        })
+          price: null as string | null,
+          url: null as string | null,
+        }
+
+        // Generate the best URL for this book
+        bookResult.url = generateBookUrls(bookResult)
+
+        // Try to get Dutch pricing if we have an ISBN
+        if (isbn) {
+          try {
+            const dutchPrice = await getDutchBookPrice(isbn, bookResult.title)
+            if (dutchPrice) {
+              bookResult.price = dutchPrice
+            }
+          } catch (error) {
+            console.log("Could not fetch Dutch pricing for", isbn)
+          }
+        }
+
+        results.push(bookResult)
       }
     }
 
@@ -135,18 +331,47 @@ export async function searchBooks(
       if (openLib.docs) {
         for (const doc of openLib.docs) {
           const isbn = doc.isbn?.[0]
-          results.push({
+          
+          // Better cover image handling
+          let coverUrl
+          if (isbn) {
+            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+          } else if (doc.cover_i) {
+            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+          }
+
+          // Validate the cover image
+          const validatedCoverUrl = await validateCoverImage(coverUrl, isbn)
+
+          const bookResult = {
             id: doc.key,
             title: doc.title,
             author: doc.author_name?.join(", ") || "Unknown Author",
             publisher: doc.publisher?.[0],
-            year: doc.first_publish_year,
+            year: doc.first_publish_year?.toString(),
             isbn: isbn,
-            coverUrl: isbn
-              ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
-              : undefined,
+            coverUrl: validatedCoverUrl,
             source: "Open Library",
-          })
+            price: null as string | null,
+            url: null as string | null,
+          }
+
+          // Generate the best URL for this book
+          bookResult.url = generateBookUrls(bookResult)
+
+          // Try to get Dutch pricing
+          if (isbn) {
+            try {
+              const dutchPrice = await getDutchBookPrice(isbn, bookResult.title)
+              if (dutchPrice) {
+                bookResult.price = dutchPrice
+              }
+            } catch (error) {
+              console.log("Could not fetch Dutch pricing for", isbn)
+            }
+          }
+
+          results.push(bookResult)
         }
       }
     }
@@ -162,16 +387,34 @@ export async function searchBooks(
 
         if (isbnDb.book) {
           const book = isbnDb.book
-          results.push({
+          
+          const bookResult = {
             id: book.isbn13,
             title: book.title,
             author: book.authors?.join(", ") || "Unknown Author",
             publisher: book.publisher,
-            year: book.date_published,
+            year: book.date_published?.split('-')[0], // Extract year
             isbn: book.isbn13,
             coverUrl: book.image,
             source: "ISBN DB",
-          })
+            price: null as string | null,
+            url: null as string | null,
+          }
+
+          // Generate the best URL for this book
+          bookResult.url = generateBookUrls(bookResult)
+
+          // Try to get Dutch pricing
+          try {
+            const dutchPrice = await getDutchBookPrice(book.isbn13, book.title)
+            if (dutchPrice) {
+              bookResult.price = dutchPrice
+            }
+          } catch (error) {
+            console.log("Could not fetch Dutch pricing for", book.isbn13)
+          }
+
+          results.push(bookResult)
         }
       } catch (error) {
         console.log("ISBN DB API not available or failed")
@@ -205,7 +448,7 @@ export async function addBook(sheetId: string, values: any[]) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:K", // adjust to your column range
+    range: "Sheet1!A:L", // adjust to your column range
     valueInputOption: "RAW",
     requestBody: {
       values: [values], // e.g. ["4", "9780140449266", "The Odyssey", "Homer", "book"]

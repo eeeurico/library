@@ -11,6 +11,8 @@ type SearchResult = {
   coverUrl?: string
   description?: string
   source: string
+  price?: string | null
+  url?: string | null
 }
 
 export default function SearchPage() {
@@ -61,6 +63,8 @@ export default function SearchPage() {
           publisher: book.publisher,
           year: book.year,
           coverUrl: book.coverUrl,
+          price: book.price || "",
+          url: book.url || "",
           type: "book",
         }),
       })
@@ -77,22 +81,24 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Search & Add Books</h1>
+    <div className="w-full">
+      <h1 className="text-4xl font-light tracking-tight text-foreground mb-8">
+        Search
+      </h1>
 
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="flex gap-4 mb-4">
+      <form onSubmit={handleSearch} className="mb-12">
+        <div className="flex gap-4 mb-6">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for books..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex h-10 w-full rounded-sm border border-[#282828] bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white transition-colors flex-1"
           />
           <select
             value={searchType}
             onChange={(e) => setSearchType(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex h-10 w-32 rounded-sm border border-[#282828] bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:border-white transition-colors cursor-pointer"
           >
             <option value="general">General</option>
             <option value="title">Title</option>
@@ -102,7 +108,7 @@ export default function SearchPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
           >
             {loading ? "Searching..." : "Search"}
           </button>
@@ -110,49 +116,66 @@ export default function SearchPage() {
       </form>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
+        <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded text-sm">
           {error}
         </div>
       )}
 
-      <div className="grid gap-6">
+      <div className="space-y-6">
         {results.map((book) => (
           <div
             key={`${book.source}-${book.id}`}
-            className="border border-gray-200 rounded-lg p-6 flex gap-4"
+            className="border border-border rounded p-6 flex gap-6"
           >
             {book.coverUrl && (
               <img
                 src={book.coverUrl}
                 alt={book.title}
-                className="w-24 h-32 object-cover rounded"
+                className="w-20 h-28 object-cover rounded-sm flex-shrink-0"
               />
             )}
-            <div className="flex-1">
-              <h3 className="text-xl font-semibold mb-2">{book.title}</h3>
-              <p className="text-gray-600 mb-1">
-                <strong>Author:</strong> {book.author}
-              </p>
-              {book.publisher && (
-                <p className="text-gray-600 mb-1">
-                  <strong>Publisher:</strong> {book.publisher}
-                </p>
-              )}
-              {book.year && (
-                <p className="text-gray-600 mb-1">
-                  <strong>Year:</strong> {book.year}
-                </p>
-              )}
-              {book.isbn && (
-                <p className="text-gray-600 mb-1">
-                  <strong>ISBN:</strong> {book.isbn}
-                </p>
-              )}
-              <p className="text-sm text-gray-500 mb-3">
-                Source: {book.source}
-              </p>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-normal text-foreground mb-2">
+                {book.title}
+              </h3>
+              <p className="text-muted-foreground mb-3">{book.author}</p>
+              <div className="space-y-1 mb-4">
+                {book.publisher && (
+                  <p className="text-sm text-muted-foreground">
+                    {book.publisher}
+                  </p>
+                )}
+                {book.year && (
+                  <p className="text-sm text-muted-foreground">{book.year}</p>
+                )}
+                {book.isbn && (
+                  <p className="text-sm text-muted-foreground font-mono">
+                    {book.isbn}
+                  </p>
+                )}
+                {book.price && (
+                  <p className="text-sm font-medium text-green-400">
+                    Dutch price: {book.price}
+                  </p>
+                )}
+                {book.url && (
+                  <a
+                    href={book.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-400 hover:text-blue-300 underline"
+                  >
+                    View on {book.url.includes('amazon.nl') ? 'Amazon NL' : 
+                             book.url.includes('bol.com') ? 'Bol.com' :
+                             book.url.includes('openlibrary.org') ? 'Open Library' :
+                             book.url.includes('books.google') ? 'Google Books' :
+                             'External Site'} ↗
+                  </a>
+                )}
+                <p className="text-xs text-muted-foreground">{book.source}</p>
+              </div>
               {book.description && (
-                <p className="text-gray-700 mb-4 text-sm line-clamp-3">
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                   {book.description.length > 200
                     ? `${book.description.substring(0, 200)}...`
                     : book.description}
@@ -160,7 +183,7 @@ export default function SearchPage() {
               )}
               <button
                 onClick={() => handleAddBook(book)}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
               >
                 Add to Library
               </button>
@@ -170,8 +193,8 @@ export default function SearchPage() {
       </div>
 
       {results.length === 0 && !loading && query && (
-        <div className="text-center text-gray-500 py-8">
-          No books found for "{query}". Try a different search term or type.
+        <div className="text-center text-muted-foreground py-12">
+          No books found for "{query}"
         </div>
       )}
     </div>

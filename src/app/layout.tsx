@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "My Library",
+  title: "BookLibrary",
   description: "Personal book library management app",
 }
 
@@ -26,24 +26,35 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased`}
       >
-        <nav className="bg-gray-800 text-white p-4">
-          <div className="container mx-auto flex justify-between items-center">
-            <Link href="/" className="text-xl font-bold">
-              📚 My Library
+        <nav className="border-b border-border/50">
+          <div className="w-full px-6 flex h-16 items-center">
+            <Link
+              href="/"
+              className="text-2xl font-light tracking-tight text-foreground"
+            >
+              BookLibrary
             </Link>
-            <div className="space-x-4">
-              <Link href="/" className="hover:text-gray-300">
+            <div className="ml-auto flex items-center space-x-8">
+              <Link
+                href="/"
+                className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Library
               </Link>
-              <Link href="/search" className="hover:text-gray-300">
-                Search & Add Books
+              <Link
+                href="/search"
+                className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Search
               </Link>
             </div>
           </div>
         </nav>
-        <main className="container mx-auto px-4 py-8">{children}</main>
+        <main className="flex-1">
+          <div className="w-full px-6 py-8">{children}</div>
+        </main>
       </body>
     </html>
   )
