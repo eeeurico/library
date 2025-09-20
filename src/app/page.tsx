@@ -40,6 +40,8 @@ export default function BooksPage() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<"default" | "title-asc" | "title-desc">("default")
+  const [quickSearch, setQuickSearch] = useState("")
 
   // Initialize view mode from localStorage
   useEffect(() => {
@@ -59,6 +61,32 @@ export default function BooksPage() {
     setViewMode(mode)
     localStorage.setItem("bookLibrary_viewMode", mode)
   }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus search on Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        const searchInput = document.querySelector('input[placeholder="Quick search books..."]') as HTMLInputElement
+        if (searchInput) {
+          searchInput.focus()
+          searchInput.select()
+        }
+      }
+      // Focus search on "/" key (like GitHub)
+      if (e.key === '/' && e.target === document.body) {
+        e.preventDefault()
+        const searchInput = document.querySelector('input[placeholder="Quick search books..."]') as HTMLInputElement
+        if (searchInput) {
+          searchInput.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     const loadBooks = async () => {
@@ -404,20 +432,124 @@ export default function BooksPage() {
         </div>
       </div>
 
-      {/* Filter books based on authentication */}
+      {/* Search and Sort Controls */}
+      <div className="w-full max-w-7xl mx-auto px-6 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          {/* Quick Search */}
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Quick search books... (Ctrl+K)"
+                value={quickSearch}
+                onChange={(e) => setQuickSearch(e.target.value)}
+                className="w-full px-4 py-2 pl-10 pr-16 text-sm bg-background border border-border rounded-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white transition-colors"
+              />
+              <svg
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {quickSearch && (
+                <button
+                  onClick={() => setQuickSearch("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sort Controls */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-muted-foreground">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "default" | "title-asc" | "title-desc")}
+              className="px-3 py-2 text-sm bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-white transition-colors cursor-pointer"
+            >
+              <option value="default">Sheet Order</option>
+              <option value="title-asc">Title A-Z</option>
+              <option value="title-desc">Title Z-A</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter, search, and sort books */}
       {(() => {
-        const filteredBooks = isAuthenticated
+        // First filter by authentication and notforsale
+        let filteredBooks = isAuthenticated
           ? books
           : books.filter((book) => !book.notforsale)
 
-        return filteredBooks.length === 0 ? (
-          <div className="text-center py-24">
-            <h3 className="text-2xl font-light text-foreground mb-3">
-              No books yet
-            </h3>
-            <p className="text-muted-foreground mb-8 font-light">
-              Start building your collection
-            </p>
+        // Apply quick search filter
+        if (quickSearch.trim()) {
+          const searchTerm = quickSearch.toLowerCase().trim()
+          filteredBooks = filteredBooks.filter((book) =>
+            book.title?.toLowerCase().includes(searchTerm) ||
+            book.author?.toLowerCase().includes(searchTerm) ||
+            book.isbn?.toLowerCase().includes(searchTerm) ||
+            book.publisher?.toLowerCase().includes(searchTerm)
+          )
+        }
+
+        // Apply sorting
+        switch (sortBy) {
+          case "title-asc":
+            filteredBooks.sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+            break
+          case "title-desc":
+            filteredBooks.sort((a, b) => (b.title || "").localeCompare(a.title || ""))
+            break
+          case "default":
+          default:
+            // Keep original sheet order (by rowIndex)
+            filteredBooks.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0))
+            break
+        }
+
+        return (
+          <>
+            {/* Results count and clear search */}
+            {(quickSearch.trim() || filteredBooks.length !== books.length) && (
+              <div className="w-full max-w-7xl mx-auto px-6 mb-4">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>
+                    Showing {filteredBooks.length} of {books.length} books
+                    {quickSearch.trim() && ` for "${quickSearch}"`}
+                  </span>
+                  {quickSearch.trim() && (
+                    <button
+                      onClick={() => setQuickSearch("")}
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {filteredBooks.length === 0 ? (
+              <div className="text-center py-24">
+                <h3 className="text-2xl font-light text-foreground mb-3">
+                  {quickSearch.trim() ? `No books found for "${quickSearch}"` : "No books yet"}
+                </h3>
+                <p className="text-muted-foreground mb-8 font-light">
+                  {quickSearch.trim() ? "Try a different search term" : "Start building your collection"}
+                </p>
             {isAuthenticated && (
               <div className="flex items-center justify-center space-x-4">
                 <button
@@ -451,6 +583,8 @@ export default function BooksPage() {
             fetchingPrices={fetchingPrices}
             isAuthenticated={isAuthenticated}
           />
+        )}
+          </>
         )
       })()}
 

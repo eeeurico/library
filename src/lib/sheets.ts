@@ -31,6 +31,66 @@ export async function getBooks(sheetId: string) {
   })
 }
 
+// Function to check if an image URL returns a valid image
+async function isValidImageUrl(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' })
+    const contentType = response.headers.get('content-type')
+    return response.ok && (contentType?.startsWith('image/') ?? false)
+  } catch {
+    return false
+  }
+}
+
+// Function to get the best available cover image from multiple sources
+async function getBestCoverImage(isbn: string, title?: string, author?: string, googleUrl?: string): Promise<string | undefined> {
+  // List of image sources to try in order of preference
+  const imageSources = [
+    // Google Books (if available)
+    googleUrl,
+    // Open Library covers (multiple sizes)
+    `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+    `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+    // Amazon covers (if ISBN-10 available)
+    ...(isbn.length === 13 ? [
+      `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(isbn)}.01.L.jpg`,
+      `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(isbn)}.01.M.jpg`
+    ] : []),
+    // WorldCat covers
+    `https://www.worldcat.org/title/-/oclc-/covers/cover?isbn=${isbn}&size=L`,
+    // BookCover API
+    `https://bookcover.longitood.com/bookcover?book_title=${encodeURIComponent(title || '')}&author_name=${encodeURIComponent(author || '')}&size=large`,
+  ].filter(Boolean) as string[]
+
+  // Try each source until we find a working image
+  for (const imageUrl of imageSources) {
+    if (await isValidImageUrl(imageUrl)) {
+      return imageUrl
+    }
+  }
+
+  return undefined
+}
+
+// Convert ISBN-13 to ISBN-10 for Amazon covers
+function convertToIsbn10(isbn13: string): string | null {
+  if (isbn13.length !== 13 || !isbn13.startsWith('978')) {
+    return null
+  }
+  
+  const isbn9 = isbn13.substring(3, 12)
+  let checksum = 0
+  
+  for (let i = 0; i < 9; i++) {
+    checksum += parseInt(isbn9[i]) * (10 - i)
+  }
+  
+  const check = (11 - (checksum % 11)) % 11
+  const checkDigit = check === 10 ? 'X' : check.toString()
+  
+  return isbn9 + checkDigit
+}
+
 export async function enrichBook(isbn: string) {
   // 1. Try Google Books
   const gb = await fetch(
@@ -40,12 +100,16 @@ export async function enrichBook(isbn: string) {
     const item = gb.items[0].volumeInfo
     const thumbnailUrl = item.imageLinks?.thumbnail
     const highResUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
+    
+    // Try to get a better cover image if Google's is not available or low quality
+    const coverUrl = await getBestCoverImage(isbn, item.title, item.authors?.[0], highResUrl)
+    
     return {
       title: item.title,
       author: item.authors?.join(", "),
       publisher: item.publisher,
       year: item.publishedDate,
-      coverUrl: highResUrl,
+      coverUrl: coverUrl,
       isbn: isbn,
     }
   }
@@ -55,12 +119,13 @@ export async function enrichBook(isbn: string) {
     (r) => r.json()
   )
   if (ol?.title) {
+    const coverUrl = await getBestCoverImage(isbn, ol.title, ol.by_statement)
     return {
       title: ol.title,
       author: ol.by_statement,
       publisher: ol.publishers?.[0],
       year: ol.publish_date,
-      coverUrl: `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+      coverUrl: coverUrl,
       isbn: isbn,
     }
   }
@@ -292,9 +357,10 @@ export async function searchBooks(
           (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
         )?.identifier
 
-        // Use original thumbnail URL with zoom=2 for higher resolution
+        // Get the best available cover image
         const thumbnailUrl = volumeInfo.imageLinks?.thumbnail
-        const coverUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
+        const googleCoverUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
+        const coverUrl = await getBestCoverImage(isbn, volumeInfo.title, volumeInfo.authors?.[0], googleCoverUrl)
 
         // Extract language from metadata
         const language =
