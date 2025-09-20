@@ -175,6 +175,7 @@ export default function BooksPage() {
 
   const handleEditSave = async (updatedBook: Book) => {
     try {
+      console.log("Saving book:", updatedBook)
       const response = await fetch("/api/books/update", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -193,9 +194,11 @@ export default function BooksPage() {
           "bookLibrary_books_timestamp",
           Date.now().toString()
         )
+        console.log("Book updated successfully")
       } else {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Failed to update book")
+        console.error("Update failed:", response.status, errorData)
+        throw new Error(errorData.error || `Failed to update book (${response.status})`)
       }
     } catch (error) {
       console.error("Error updating book:", error)
