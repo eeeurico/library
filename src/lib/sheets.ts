@@ -69,20 +69,23 @@ export async function enrichBook(isbn: string) {
   return null
 }
 
-export async function searchBooks(query: string, type: 'title' | 'author' | 'isbn' | 'general' = 'general') {
+export async function searchBooks(
+  query: string,
+  type: "title" | "author" | "isbn" | "general" = "general"
+) {
   const results: any[] = []
 
   try {
     // 1. Search Google Books API
-    let googleQuery = ''
+    let googleQuery = ""
     switch (type) {
-      case 'title':
+      case "title":
         googleQuery = `intitle:${query}`
         break
-      case 'author':
+      case "author":
         googleQuery = `inauthor:${query}`
         break
-      case 'isbn':
+      case "isbn":
         googleQuery = `isbn:${query}`
         break
       default:
@@ -90,36 +93,41 @@ export async function searchBooks(query: string, type: 'title' | 'author' | 'isb
     }
 
     const googleBooks = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(googleQuery)}&maxResults=10`
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+        googleQuery
+      )}&maxResults=10`
     ).then((r) => r.json())
 
     if (googleBooks.items) {
       for (const item of googleBooks.items) {
         const volumeInfo = item.volumeInfo
-        const isbn = volumeInfo.industryIdentifiers?.find((id: any) => 
-          id.type === 'ISBN_13' || id.type === 'ISBN_10'
+        const isbn = volumeInfo.industryIdentifiers?.find(
+          (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
         )?.identifier
 
         results.push({
           id: item.id,
           title: volumeInfo.title,
-          author: volumeInfo.authors?.join(', ') || 'Unknown Author',
+          author: volumeInfo.authors?.join(", ") || "Unknown Author",
           publisher: volumeInfo.publisher,
           year: volumeInfo.publishedDate,
           isbn: isbn,
           coverUrl: volumeInfo.imageLinks?.thumbnail,
           description: volumeInfo.description,
-          source: 'Google Books'
+          source: "Google Books",
         })
       }
     }
 
     // 2. Search Open Library API
-    if (type !== 'isbn') {
-      const openLibQuery = type === 'title' ? `title=${query}` : 
-                          type === 'author' ? `author=${query}` : 
-                          `q=${query}`
-      
+    if (type !== "isbn") {
+      const openLibQuery =
+        type === "title"
+          ? `title=${query}`
+          : type === "author"
+          ? `author=${query}`
+          : `q=${query}`
+
       const openLib = await fetch(
         `https://openlibrary.org/search.json?${openLibQuery}&limit=5`
       ).then((r) => r.json())
@@ -130,56 +138,58 @@ export async function searchBooks(query: string, type: 'title' | 'author' | 'isb
           results.push({
             id: doc.key,
             title: doc.title,
-            author: doc.author_name?.join(', ') || 'Unknown Author',
+            author: doc.author_name?.join(", ") || "Unknown Author",
             publisher: doc.publisher?.[0],
             year: doc.first_publish_year,
             isbn: isbn,
-            coverUrl: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg` : undefined,
-            source: 'Open Library'
+            coverUrl: isbn
+              ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
+              : undefined,
+            source: "Open Library",
           })
         }
       }
     }
 
     // 3. For ISBN searches, also try ISBN DB (free API)
-    if (type === 'isbn') {
+    if (type === "isbn") {
       try {
-        const isbnDb = await fetch(
-          `https://api.isbndb.com/book/${query}`,
-          {
-            headers: {
-              'Authorization': process.env.ISBN_DB_API_KEY || ''
-            }
-          }
-        ).then((r) => r.json())
+        const isbnDb = await fetch(`https://api.isbndb.com/book/${query}`, {
+          headers: {
+            Authorization: process.env.ISBN_DB_API_KEY || "",
+          },
+        }).then((r) => r.json())
 
         if (isbnDb.book) {
           const book = isbnDb.book
           results.push({
             id: book.isbn13,
             title: book.title,
-            author: book.authors?.join(', ') || 'Unknown Author',
+            author: book.authors?.join(", ") || "Unknown Author",
             publisher: book.publisher,
             year: book.date_published,
             isbn: book.isbn13,
             coverUrl: book.image,
-            source: 'ISBN DB'
+            source: "ISBN DB",
           })
         }
       } catch (error) {
-        console.log('ISBN DB API not available or failed')
+        console.log("ISBN DB API not available or failed")
       }
     }
-
   } catch (error) {
-    console.error('Search failed:', error)
+    console.error("Search failed:", error)
   }
 
   // Remove duplicates based on ISBN or title+author
   const unique = results.filter((book, index, self) => {
-    return index === self.findIndex((b) => 
-      (book.isbn && b.isbn && book.isbn === b.isbn) ||
-      (book.title === b.title && book.author === b.author)
+    return (
+      index ===
+      self.findIndex(
+        (b) =>
+          (book.isbn && b.isbn && book.isbn === b.isbn) ||
+          (book.title === b.title && book.author === b.author)
+      )
     )
   })
 
