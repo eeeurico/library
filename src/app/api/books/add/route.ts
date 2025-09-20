@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       // New format - convert book object to values array
       // Order matches your Google Sheet headers: id, isbn, title, author, type, publisher, year, edition, coverUrl, notes, price, url, language, sellingprice, notforsale
       values = [
-        "", // ID (auto-generated or empty)
+        bookData.id || "", // Use provided ID or empty for auto-generation
         bookData.isbn || "",
         bookData.title || "",
         bookData.author || "",

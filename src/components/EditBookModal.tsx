@@ -26,7 +26,7 @@ interface EditBookModalProps {
   book: Book
   isOpen: boolean
   onClose: () => void
-  onSave: (updatedBook: Book) => void
+  onSave: (updatedBook: Book) => Promise<void>
 }
 
 // Image resizing utility function
@@ -89,6 +89,7 @@ export default function EditBookModal({
 }: EditBookModalProps) {
   const [formData, setFormData] = useState<Book>(book)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -96,9 +97,23 @@ export default function EditBookModal({
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = () => {
-    onSave(formData)
-    onClose()
+  const handleSave = async () => {
+    // If upload is in progress, wait for it to complete
+    if (isUploading) {
+      alert("Please wait for the image upload to complete before saving.")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave(formData)
+      onClose()
+    } catch (error) {
+      console.error("Error saving book:", error)
+      alert("Failed to save book changes. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleImageUpload = useCallback(async (files: File[]) => {
@@ -386,10 +401,14 @@ export default function EditBookModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={isUploading}
+            disabled={isUploading || isSaving}
             className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
           >
-            {isUploading ? "Uploading..." : "Save Changes"}
+            {isUploading
+              ? "Uploading..."
+              : isSaving
+              ? "Saving..."
+              : "Save Changes"}
           </button>
         </div>
       </div>

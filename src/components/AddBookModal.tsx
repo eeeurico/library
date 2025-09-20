@@ -24,7 +24,7 @@ type NewBook = {
 interface AddBookModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (newBook: NewBook) => void
+  onSave: (newBook: NewBook) => Promise<void>
 }
 
 // Image resizing utility function
@@ -101,37 +101,45 @@ export default function AddBookModal({
     notforsale: false,
   })
   const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleInputChange = (field: keyof NewBook, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title.trim() || !formData.author.trim()) {
       alert("Title and Author are required fields.")
       return
     }
 
-    onSave(formData)
-
-    // Reset form
-    setFormData({
-      title: "",
-      author: "",
-      type: "book",
-      isbn: "",
-      publisher: "",
-      year: "",
-      edition: "",
-      coverUrl: "",
-      notes: "",
-      price: "",
-      url: "",
-      language: "",
-      sellingprice: "",
-      notforsale: false,
-    })
-    onClose()
+    setIsSaving(true)
+    try {
+      await onSave(formData)
+      // Reset form after successful save
+      setFormData({
+        title: "",
+        author: "",
+        type: "book",
+        isbn: "",
+        publisher: "",
+        year: "",
+        edition: "",
+        coverUrl: "",
+        notes: "",
+        price: "",
+        url: "",
+        language: "",
+        sellingprice: "",
+        notforsale: false,
+      })
+      onClose()
+    } catch (error) {
+      console.error("Error saving book:", error)
+      alert("Failed to save book. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleClose = () => {
@@ -433,11 +441,14 @@ export default function AddBookModal({
           <button
             onClick={handleSave}
             disabled={
-              isUploading || !formData.title.trim() || !formData.author.trim()
+              isUploading ||
+              isSaving ||
+              !formData.title.trim() ||
+              !formData.author.trim()
             }
             className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
           >
-            {isUploading ? "Uploading..." : "Add Book"}
+            {isUploading ? "Uploading..." : isSaving ? "Adding..." : "Add Book"}
           </button>
         </div>
       </div>

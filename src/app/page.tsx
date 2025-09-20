@@ -194,14 +194,16 @@ export default function BooksPage() {
           Date.now().toString()
         )
       } else {
-        alert("Failed to update book")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to update book")
       }
     } catch (error) {
-      alert("Error updating book")
+      console.error("Error updating book:", error)
+      throw error // Re-throw so the modal can handle it
     }
   }
 
-  const handleManualAdd = async (newBook: any) => {
+  const handleManualAdd = async (newBook: any): Promise<void> => {
     try {
       // Generate the next available ID
       const nextId =
@@ -220,23 +222,26 @@ export default function BooksPage() {
         body: JSON.stringify(bookToAdd),
       })
 
-      if (response.ok) {
-        // Refresh the book list by fetching fresh data
-        const res = await fetch("/api/books")
-        const data = await res.json()
-        setBooks(data)
-
-        // Update cache
-        localStorage.setItem("bookLibrary_books", JSON.stringify(data))
-        localStorage.setItem(
-          "bookLibrary_books_timestamp",
-          Date.now().toString()
-        )
-      } else {
-        alert("Failed to add book")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to add book")
       }
+
+      // Refresh the book list by fetching fresh data
+      const res = await fetch("/api/books")
+      if (!res.ok) {
+        throw new Error("Failed to refresh book list")
+      }
+
+      const data = await res.json()
+      setBooks(data)
+
+      // Update cache
+      localStorage.setItem("bookLibrary_books", JSON.stringify(data))
+      localStorage.setItem("bookLibrary_books_timestamp", Date.now().toString())
     } catch (error) {
-      alert("Error adding book")
+      console.error("Error adding book:", error)
+      throw error // Re-throw to let the modal handle the error display
     }
   }
 

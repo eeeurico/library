@@ -38,12 +38,14 @@ export async function enrichBook(isbn: string) {
   ).then((r) => r.json())
   if (gb.totalItems > 0) {
     const item = gb.items[0].volumeInfo
+    const thumbnailUrl = item.imageLinks?.thumbnail
+    const highResUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
     return {
       title: item.title,
       author: item.authors?.join(", "),
       publisher: item.publisher,
       year: item.publishedDate,
-      coverUrl: item.imageLinks?.thumbnail,
+      coverUrl: highResUrl,
       isbn: isbn,
     }
   }
@@ -290,8 +292,9 @@ export async function searchBooks(
           (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
         )?.identifier
 
-        // Use original thumbnail URL - no validation needed for search
-        const coverUrl = volumeInfo.imageLinks?.thumbnail
+        // Use original thumbnail URL with zoom=2 for higher resolution
+        const thumbnailUrl = volumeInfo.imageLinks?.thumbnail
+        const coverUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
 
         // Extract language from metadata
         const language =
