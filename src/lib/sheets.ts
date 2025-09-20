@@ -76,20 +76,23 @@ export async function enrichBook(isbn: string) {
 // 3. BookSpot.nl API
 // 4. Web scraping services like Apify or ScrapingBee
 // 5. Price comparison sites APIs
-export async function getDutchBookPrice(isbn: string, title: string): Promise<string | null> {
+export async function getDutchBookPrice(
+  isbn: string,
+  title: string
+): Promise<string | null> {
   try {
     // Method 1: Try to check if the book is available via European sources
     // You can later replace this with actual Dutch bookstore APIs
-    
+
     // Check if we can get any pricing hints from Google Books
     try {
       const googleCheck = await fetch(
         `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&country=NL`
       ).then((r) => r.json())
-      
+
       if (googleCheck.items && googleCheck.items[0]) {
         const saleInfo = googleCheck.items[0].saleInfo
-        if (saleInfo && saleInfo.country === 'NL' && saleInfo.listPrice) {
+        if (saleInfo && saleInfo.country === "NL" && saleInfo.listPrice) {
           return `€${saleInfo.listPrice.amount}`
         }
       }
@@ -99,18 +102,21 @@ export async function getDutchBookPrice(isbn: string, title: string): Promise<st
 
     // Method 2: Check Open Library for Dutch availability
     try {
-      const olResponse = await fetch(`https://openlibrary.org/isbn/${isbn}.json`)
+      const olResponse = await fetch(
+        `https://openlibrary.org/isbn/${isbn}.json`
+      )
       if (olResponse.ok) {
         const olData = await olResponse.json()
-        
+
         // Check if it's available in Dutch or from Dutch publishers
-        const isDutchRelated = olData.publishers?.some((p: string) => 
-          p.toLowerCase().includes('nederland') || 
-          p.toLowerCase().includes('dutch') ||
-          p.toLowerCase().includes('amsterdam') ||
-          p.toLowerCase().includes('rotterdam')
+        const isDutchRelated = olData.publishers?.some(
+          (p: string) =>
+            p.toLowerCase().includes("nederland") ||
+            p.toLowerCase().includes("dutch") ||
+            p.toLowerCase().includes("amsterdam") ||
+            p.toLowerCase().includes("rotterdam")
         )
-        
+
         if (isDutchRelated) {
           // Give a reasonable estimate for Dutch books
           const basePrice = Math.floor(Math.random() * 15) + 12 // €12-27
@@ -124,20 +130,24 @@ export async function getDutchBookPrice(isbn: string, title: string): Promise<st
     // Method 3: Estimate based on title/genre keywords
     const titleLower = title.toLowerCase()
     let estimatedPrice = 15 // Base price
-    
+
     // Adjust price based on book characteristics
-    if (titleLower.includes('textbook') || titleLower.includes('handbook')) {
+    if (titleLower.includes("textbook") || titleLower.includes("handbook")) {
       estimatedPrice += Math.floor(Math.random() * 30) + 20 // €35-65
-    } else if (titleLower.includes('cookbook') || titleLower.includes('recipe')) {
+    } else if (
+      titleLower.includes("cookbook") ||
+      titleLower.includes("recipe")
+    ) {
       estimatedPrice += Math.floor(Math.random() * 15) + 10 // €25-40
-    } else if (titleLower.includes('children') || titleLower.includes('kids')) {
+    } else if (titleLower.includes("children") || titleLower.includes("kids")) {
       estimatedPrice = Math.floor(Math.random() * 10) + 8 // €8-18
     } else {
       estimatedPrice += Math.floor(Math.random() * 20) + 5 // €20-40
     }
-    
-    return `€${estimatedPrice}.${Math.floor(Math.random() * 99).toString().padStart(2, '0')}`
-    
+
+    return `€${estimatedPrice}.${Math.floor(Math.random() * 99)
+      .toString()
+      .padStart(2, "0")}`
   } catch (error) {
     console.error("Error fetching Dutch pricing:", error)
     return null
@@ -145,17 +155,20 @@ export async function getDutchBookPrice(isbn: string, title: string): Promise<st
 }
 
 // Function to validate and improve cover image URLs
-export async function validateCoverImage(url: string | undefined, isbn?: string): Promise<string | null> {
+export async function validateCoverImage(
+  url: string | undefined,
+  isbn?: string
+): Promise<string | null> {
   if (!url && !isbn) return null
-  
+
   // If we have a URL, try to improve it
   if (url) {
     // Clean up Google Books image URLs for better quality
-    let cleanUrl = url.replace('&edge=curl', '').replace('zoom=1', 'zoom=2')
-    
+    let cleanUrl = url.replace("&edge=curl", "").replace("zoom=1", "zoom=2")
+
     // Try to verify the image exists
     try {
-      const response = await fetch(cleanUrl, { method: 'HEAD' })
+      const response = await fetch(cleanUrl, { method: "HEAD" })
       if (response.ok) {
         return cleanUrl
       }
@@ -163,17 +176,17 @@ export async function validateCoverImage(url: string | undefined, isbn?: string)
       console.log("Original cover URL failed, trying fallbacks")
     }
   }
-  
+
   // Fallback to Open Library if we have ISBN
   if (isbn) {
     const fallbackUrls = [
       `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
       `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
     ]
-    
+
     for (const fallbackUrl of fallbackUrls) {
       try {
-        const response = await fetch(fallbackUrl, { method: 'HEAD' })
+        const response = await fetch(fallbackUrl, { method: "HEAD" })
         if (response.ok) {
           return fallbackUrl
         }
@@ -182,57 +195,61 @@ export async function validateCoverImage(url: string | undefined, isbn?: string)
       }
     }
   }
-  
+
   return null
 }
 
 // Helper functions to generate book URLs
 export function generateBookUrls(book: {
-  isbn?: string;
-  title: string;
-  author: string;
-  source: string;
-  id?: string;
+  isbn?: string
+  title: string
+  author: string
+  source: string
+  id?: string
 }) {
   const urls: { label: string; url: string }[] = []
-  
+
   // Dutch Amazon URL (prioritize for Dutch users)
   if (book.isbn) {
     urls.push({
       label: "Amazon NL",
-      url: `https://www.amazon.nl/s?k=${encodeURIComponent(book.isbn)}&i=stripbooks`
+      url: `https://www.amazon.nl/s?k=${encodeURIComponent(
+        book.isbn
+      )}&i=stripbooks`,
     })
   }
-  
+
   // Bol.com (major Dutch bookstore)
   if (book.isbn) {
     urls.push({
       label: "Bol.com",
-      url: `https://www.bol.com/nl/nl/s/?searchtext=${encodeURIComponent(book.isbn)}`
+      url: `https://www.bol.com/nl/nl/s/?searchtext=${encodeURIComponent(
+        book.isbn
+      )}`,
     })
   }
-  
+
   // Source-specific URLs
   if (book.source === "Google Books" && book.id) {
     urls.push({
       label: "Google Books",
-      url: `https://books.google.nl/books?id=${book.id}`
+      url: `https://books.google.nl/books?id=${book.id}`,
     })
   } else if (book.source === "Open Library" && book.id) {
     urls.push({
       label: "Open Library",
-      url: `https://openlibrary.org${book.id}`
+      url: `https://openlibrary.org${book.id}`,
     })
   }
-  
+
   // Worldcat (international library catalog)
   if (book.isbn) {
     urls.push({
       label: "WorldCat",
-      url: `https://www.worldcat.org/isbn/${book.isbn}`
+      url: `https://www.worldcat.org/isbn/${book.isbn}`,
     })
   }
-  
+
   // Return the best URL (prioritize Dutch sources)
   return urls.length > 0 ? urls[0].url : null
 }
@@ -281,7 +298,7 @@ export async function searchBooks(
           title: volumeInfo.title,
           author: volumeInfo.authors?.join(", ") || "Unknown Author",
           publisher: volumeInfo.publisher,
-          year: volumeInfo.publishedDate?.split('-')[0], // Extract just the year
+          year: volumeInfo.publishedDate?.split("-")[0], // Extract just the year
           isbn: isbn,
           coverUrl: coverUrl,
           description: volumeInfo.description,
@@ -313,7 +330,7 @@ export async function searchBooks(
       if (openLib.docs) {
         for (const doc of openLib.docs) {
           const isbn = doc.isbn?.[0]
-          
+
           // Simple cover image handling - no validation for search
           let coverUrl
           if (isbn) {
@@ -354,13 +371,13 @@ export async function searchBooks(
 
         if (isbnDb.book) {
           const book = isbnDb.book
-          
+
           const bookResult = {
             id: book.isbn13,
             title: book.title,
             author: book.authors?.join(", ") || "Unknown Author",
             publisher: book.publisher,
-            year: book.date_published?.split('-')[0], // Extract year
+            year: book.date_published?.split("-")[0], // Extract year
             isbn: book.isbn13,
             coverUrl: book.image,
             source: "ISBN DB",
@@ -402,7 +419,10 @@ export async function getSheets() {
 }
 
 // Function to fetch Dutch pricing for a single book (on-demand)
-export async function fetchBookPrice(isbn: string, title: string): Promise<string | null> {
+export async function fetchBookPrice(
+  isbn: string,
+  title: string
+): Promise<string | null> {
   return await getDutchBookPrice(isbn, title)
 }
 
@@ -439,7 +459,11 @@ export async function deleteBook(sheetId: string, rowIndex: number) {
   })
 }
 
-export async function updateBook(sheetId: string, rowIndex: number, values: any[]) {
+export async function updateBook(
+  sheetId: string,
+  rowIndex: number,
+  values: any[]
+) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,

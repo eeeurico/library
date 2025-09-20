@@ -1,9 +1,9 @@
 "use client"
-import { useState, useRef, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { UploadDropzone } from "@uploadthing/react"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
 
-type Book = {
+type NewBook = {
   id?: string
   isbn?: string
   title: string
@@ -16,14 +16,12 @@ type Book = {
   year?: string
   url?: string
   edition?: string
-  rowIndex: number
 }
 
-interface EditBookModalProps {
-  book: Book
+interface AddBookModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (updatedBook: Book) => void
+  onSave: (newBook: NewBook) => void
 }
 
 // Image resizing utility function
@@ -78,59 +76,72 @@ const resizeImage = (
   })
 }
 
-export default function EditBookModal({
-  book,
+export default function AddBookModal({
   isOpen,
   onClose,
   onSave,
-}: EditBookModalProps) {
-  const [formData, setFormData] = useState<Book>(book)
+}: AddBookModalProps) {
+  const [formData, setFormData] = useState<NewBook>({
+    title: "",
+    author: "",
+    type: "book",
+    isbn: "",
+    publisher: "",
+    year: "",
+    edition: "",
+    coverUrl: "",
+    notes: "",
+    price: "",
+    url: "",
+  })
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleInputChange = (field: keyof Book, value: string) => {
+  const handleInputChange = (field: keyof NewBook, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSave = () => {
+    if (!formData.title.trim() || !formData.author.trim()) {
+      alert("Title and Author are required fields.")
+      return
+    }
+
     onSave(formData)
+
+    // Reset form
+    setFormData({
+      title: "",
+      author: "",
+      type: "book",
+      isbn: "",
+      publisher: "",
+      year: "",
+      edition: "",
+      coverUrl: "",
+      notes: "",
+      price: "",
+      url: "",
+    })
     onClose()
   }
 
-  const handleImageUpload = useCallback(async (files: File[]) => {
-    if (files.length === 0) return
-
-    const file = files[0]
-    setIsUploading(true)
-    setUploadProgress(0)
-
-    try {
-      // Resize image if needed
-      const resizedFile = await resizeImage(file, 400, 400)
-
-      // Create FormData for upload
-      const formData = new FormData()
-      formData.append("file", resizedFile)
-
-      // Upload to uploadthing
-      const response = await fetch("/api/uploadthing", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setFormData((prev) => ({ ...prev, coverUrl: result.url }))
-      }
-    } catch (error) {
-      console.error("Upload failed:", error)
-      alert("Image upload failed. Please try again.")
-    } finally {
-      setIsUploading(false)
-      setUploadProgress(0)
-    }
-  }, [])
+  const handleClose = () => {
+    // Reset form on close
+    setFormData({
+      title: "",
+      author: "",
+      type: "book",
+      isbn: "",
+      publisher: "",
+      year: "",
+      edition: "",
+      coverUrl: "",
+      notes: "",
+      price: "",
+      url: "",
+    })
+    onClose()
+  }
 
   if (!isOpen) return null
 
@@ -139,9 +150,11 @@ export default function EditBookModal({
       <div className="bg-background border border-border rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-light text-foreground">Edit Book</h2>
+          <h2 className="text-xl font-light text-foreground">
+            Add Book Manually
+          </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg
@@ -172,7 +185,7 @@ export default function EditBookModal({
                 <div className="flex-shrink-0">
                   <img
                     src={formData.coverUrl}
-                    alt={formData.title}
+                    alt={formData.title || "Book cover"}
                     className="w-24 h-32 object-cover rounded border border-border"
                   />
                 </div>
@@ -206,26 +219,46 @@ export default function EditBookModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Title
+                Title <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 value={formData.title}
                 onChange={(e) => handleInputChange("title", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="Enter book title"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Author
+                Author <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 value={formData.author}
                 onChange={(e) => handleInputChange("author", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="Enter author name"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Type
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) => handleInputChange("type", e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+              >
+                <option value="book">Book</option>
+                <option value="zine">Zine</option>
+                <option value="artist edition">Artist Edition</option>
+                <option value="magazine">Magazine</option>
+                <option value="catalog">Catalog</option>
+                <option value="other">Other</option>
+              </select>
             </div>
 
             <div>
@@ -237,6 +270,7 @@ export default function EditBookModal({
                 value={formData.isbn || ""}
                 onChange={(e) => handleInputChange("isbn", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors font-mono"
+                placeholder="978-0-123456-78-9"
               />
             </div>
 
@@ -249,6 +283,7 @@ export default function EditBookModal({
                 value={formData.publisher || ""}
                 onChange={(e) => handleInputChange("publisher", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="Publisher name"
               />
             </div>
 
@@ -261,6 +296,7 @@ export default function EditBookModal({
                 value={formData.year || ""}
                 onChange={(e) => handleInputChange("year", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="2024"
               />
             </div>
 
@@ -273,6 +309,7 @@ export default function EditBookModal({
                 value={formData.edition || ""}
                 onChange={(e) => handleInputChange("edition", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="First edition, Limited edition, etc."
               />
             </div>
 
@@ -289,7 +326,7 @@ export default function EditBookModal({
               />
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-foreground mb-2">
                 URL
               </label>
@@ -298,7 +335,7 @@ export default function EditBookModal({
                 value={formData.url || ""}
                 onChange={(e) => handleInputChange("url", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
-                placeholder="https://..."
+                placeholder="https://... (optional link to artist page, gallery, etc.)"
               />
             </div>
           </div>
@@ -312,7 +349,7 @@ export default function EditBookModal({
               onChange={(e) => handleInputChange("notes", e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors resize-vertical"
-              placeholder="Add your notes about this book..."
+              placeholder="Add notes about this book, zine, or edition..."
             />
           </div>
         </div>
@@ -320,17 +357,19 @@ export default function EditBookModal({
         {/* Footer */}
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            disabled={isUploading}
+            disabled={
+              isUploading || !formData.title.trim() || !formData.author.trim()
+            }
             className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
           >
-            {isUploading ? "Uploading..." : "Save Changes"}
+            {isUploading ? "Uploading..." : "Add Book"}
           </button>
         </div>
       </div>

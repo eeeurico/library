@@ -69,11 +69,11 @@ export default function SearchPage() {
         }),
       })
 
-            if (response.ok) {
+      if (response.ok) {
         // Clear the books cache so it refreshes on next visit
-        localStorage.removeItem('bookLibrary_books')
-        localStorage.removeItem('bookLibrary_books_timestamp')
-        
+        localStorage.removeItem("bookLibrary_books")
+        localStorage.removeItem("bookLibrary_books_timestamp")
+
         alert(`"${book.title}" has been added to your library!`)
       } else {
         const error = await response.json()
@@ -164,11 +164,17 @@ export default function SearchPage() {
                     rel="noopener noreferrer"
                     className="text-sm text-blue-400 hover:text-blue-300 underline"
                   >
-                    View on {book.url.includes('amazon.nl') ? 'Amazon NL' : 
-                             book.url.includes('bol.com') ? 'Bol.com' :
-                             book.url.includes('openlibrary.org') ? 'Open Library' :
-                             book.url.includes('books.google') ? 'Google Books' :
-                             'External Site'} ↗
+                    View on{" "}
+                    {book.url.includes("amazon.nl")
+                      ? "Amazon NL"
+                      : book.url.includes("bol.com")
+                      ? "Bol.com"
+                      : book.url.includes("openlibrary.org")
+                      ? "Open Library"
+                      : book.url.includes("books.google")
+                      ? "Google Books"
+                      : "External Site"}{" "}
+                    ↗
                   </a>
                 )}
                 <p className="text-xs text-muted-foreground">{book.source}</p>

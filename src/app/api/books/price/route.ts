@@ -4,8 +4,8 @@ import { fetchBookPrice } from "@/lib/sheets"
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const isbn = searchParams.get('isbn')
-    const title = searchParams.get('title')
+    const isbn = searchParams.get("isbn")
+    const title = searchParams.get("title")
 
     if (!isbn || !title) {
       return NextResponse.json(

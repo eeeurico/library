@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import EditBookModal from "@/components/EditBookModal"
+import AddBookModal from "@/components/AddBookModal"
 
 type Book = {
   id?: string
@@ -27,11 +28,17 @@ export default function BooksPage() {
   const [isValidating, setIsValidating] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   // Initialize view mode from localStorage
   useEffect(() => {
-    const savedViewMode = localStorage.getItem('bookLibrary_viewMode') as ViewMode
-    if (savedViewMode && (savedViewMode === 'grid' || savedViewMode === 'table')) {
+    const savedViewMode = localStorage.getItem(
+      "bookLibrary_viewMode"
+    ) as ViewMode
+    if (
+      savedViewMode &&
+      (savedViewMode === "grid" || savedViewMode === "table")
+    ) {
       setViewMode(savedViewMode)
     }
   }, [])
@@ -39,16 +46,20 @@ export default function BooksPage() {
   // Save view mode to localStorage when it changes
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode)
-    localStorage.setItem('bookLibrary_viewMode', mode)
+    localStorage.setItem("bookLibrary_viewMode", mode)
   }
 
   useEffect(() => {
     const loadBooks = async () => {
       try {
         // Try to load from localStorage first
-        const cachedBooks = localStorage.getItem('bookLibrary_books')
-        const cacheTimestamp = localStorage.getItem('bookLibrary_books_timestamp')
-        const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
+        const cachedBooks = localStorage.getItem("bookLibrary_books")
+        const cacheTimestamp = localStorage.getItem(
+          "bookLibrary_books_timestamp"
+        )
+        const cacheAge = cacheTimestamp
+          ? Date.now() - parseInt(cacheTimestamp)
+          : Infinity
         const cacheMaxAge = 5 * 60 * 1000 // 5 minutes
 
         if (cachedBooks && cacheAge < cacheMaxAge) {
@@ -67,7 +78,7 @@ export default function BooksPage() {
           await fetchFreshBooks()
         }
       } catch (error) {
-        console.error('Error loading books:', error)
+        console.error("Error loading books:", error)
         // Fallback to fresh fetch
         await fetchFreshBooks()
       }
@@ -78,12 +89,15 @@ export default function BooksPage() {
         const res = await fetch("/api/books")
         const data = await res.json()
         setBooks(data)
-        
+
         // Cache the data
-        localStorage.setItem('bookLibrary_books', JSON.stringify(data))
-        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+        localStorage.setItem("bookLibrary_books", JSON.stringify(data))
+        localStorage.setItem(
+          "bookLibrary_books_timestamp",
+          Date.now().toString()
+        )
       } catch (error) {
-        console.error('Error fetching fresh books:', error)
+        console.error("Error fetching fresh books:", error)
       } finally {
         setLoading(false)
         setIsValidating(false)
@@ -94,17 +108,21 @@ export default function BooksPage() {
       try {
         const res = await fetch("/api/books")
         const freshData = await res.json()
-        
+
         // Compare with cached data
-        const dataChanged = JSON.stringify(cachedBooks) !== JSON.stringify(freshData)
-        
+        const dataChanged =
+          JSON.stringify(cachedBooks) !== JSON.stringify(freshData)
+
         if (dataChanged) {
           setBooks(freshData)
-          localStorage.setItem('bookLibrary_books', JSON.stringify(freshData))
-          localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+          localStorage.setItem("bookLibrary_books", JSON.stringify(freshData))
+          localStorage.setItem(
+            "bookLibrary_books_timestamp",
+            Date.now().toString()
+          )
         }
       } catch (error) {
-        console.error('Error validating books:', error)
+        console.error("Error validating books:", error)
       } finally {
         setIsValidating(false)
       }
@@ -126,10 +144,13 @@ export default function BooksPage() {
       if (response.ok) {
         const updatedBooks = books.filter((b) => b.rowIndex !== book.rowIndex)
         setBooks(updatedBooks)
-        
+
         // Update cache immediately
-        localStorage.setItem('bookLibrary_books', JSON.stringify(updatedBooks))
-        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+        localStorage.setItem("bookLibrary_books", JSON.stringify(updatedBooks))
+        localStorage.setItem(
+          "bookLibrary_books_timestamp",
+          Date.now().toString()
+        )
       } else {
         alert("Failed to delete book")
       }
@@ -156,10 +177,13 @@ export default function BooksPage() {
           book.rowIndex === updatedBook.rowIndex ? updatedBook : book
         )
         setBooks(updatedBooks)
-        
+
         // Update cache immediately
-        localStorage.setItem('bookLibrary_books', JSON.stringify(updatedBooks))
-        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+        localStorage.setItem("bookLibrary_books", JSON.stringify(updatedBooks))
+        localStorage.setItem(
+          "bookLibrary_books_timestamp",
+          Date.now().toString()
+        )
       } else {
         alert("Failed to update book")
       }
@@ -168,31 +192,70 @@ export default function BooksPage() {
     }
   }
 
+  const handleManualAdd = async (newBook: any) => {
+    try {
+      // Generate the next available ID
+      const nextId =
+        books.length > 0
+          ? Math.max(...books.map((b) => parseInt(b.id || "0"))) + 1
+          : 1
+
+      const bookToAdd = {
+        ...newBook,
+        id: nextId.toString(),
+      }
+
+      const response = await fetch("/api/books/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookToAdd),
+      })
+
+      if (response.ok) {
+        // Refresh the book list by fetching fresh data
+        const res = await fetch("/api/books")
+        const data = await res.json()
+        setBooks(data)
+
+        // Update cache
+        localStorage.setItem("bookLibrary_books", JSON.stringify(data))
+        localStorage.setItem(
+          "bookLibrary_books_timestamp",
+          Date.now().toString()
+        )
+      } else {
+        alert("Failed to add book")
+      }
+    } catch (error) {
+      alert("Error adding book")
+    }
+  }
+
   const handleFetchPrice = async (book: Book) => {
     if (!book.isbn || !book.title) return
-    
-    setFetchingPrices(prev => new Set([...prev, book.rowIndex]))
-    
+
+    setFetchingPrices((prev) => new Set([...prev, book.rowIndex]))
+
     try {
       const response = await fetch(
-        `/api/books/price?isbn=${encodeURIComponent(book.isbn)}&title=${encodeURIComponent(book.title)}`
+        `/api/books/price?isbn=${encodeURIComponent(
+          book.isbn
+        )}&title=${encodeURIComponent(book.title)}`
       )
       const data = await response.json()
-      
+
       if (response.ok && data.price) {
         // Update the book in the local state
-        setBooks(prevBooks => 
-          prevBooks.map(b => 
-            b.rowIndex === book.rowIndex 
-              ? { ...b, price: data.price }
-              : b
+        setBooks((prevBooks) =>
+          prevBooks.map((b) =>
+            b.rowIndex === book.rowIndex ? { ...b, price: data.price } : b
           )
         )
       }
     } catch (error) {
       console.error("Failed to fetch price:", error)
     } finally {
-      setFetchingPrices(prev => {
+      setFetchingPrices((prev) => {
         const newSet = new Set(prev)
         newSet.delete(book.rowIndex)
         return newSet
@@ -202,8 +265,8 @@ export default function BooksPage() {
 
   // Utility function to clear cache manually if needed
   const clearCache = () => {
-    localStorage.removeItem('bookLibrary_books')
-    localStorage.removeItem('bookLibrary_books_timestamp')
+    localStorage.removeItem("bookLibrary_books")
+    localStorage.removeItem("bookLibrary_books_timestamp")
     window.location.reload()
   }
 
@@ -235,6 +298,20 @@ export default function BooksPage() {
               <span>Updating...</span>
             </div>
           )}
+          <div className="flex items-center space-x-3">
+            <a
+              href="/search"
+              className="px-4 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+            >
+              Search Books
+            </a>
+            <button
+              onClick={() => setAddModalOpen(true)}
+              className="px-4 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+            >
+              Add Manually
+            </button>
+          </div>
           <button
             onClick={clearCache}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -275,18 +352,26 @@ export default function BooksPage() {
           <p className="text-muted-foreground mb-8 font-light">
             Start building your collection
           </p>
-          <a
-            href="/search"
-            className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
-          >
-            Add Books
-          </a>
+          <div className="flex items-center justify-center space-x-4">
+            <a
+              href="/search"
+              className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+            >
+              Search Books
+            </a>
+            <button
+              onClick={() => setAddModalOpen(true)}
+              className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+            >
+              Add Manually
+            </button>
+          </div>
         </div>
       ) : viewMode === "grid" ? (
         <GridView books={books} onDelete={handleDelete} onEdit={handleEdit} />
       ) : (
-        <TableView 
-          books={books} 
+        <TableView
+          books={books}
           onDelete={handleDelete}
           onEdit={handleEdit}
           onFetchPrice={handleFetchPrice}
@@ -306,6 +391,13 @@ export default function BooksPage() {
           onSave={handleEditSave}
         />
       )}
+
+      {/* Add Manual Book Modal */}
+      <AddBookModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSave={handleManualAdd}
+      />
     </div>
   )
 }
