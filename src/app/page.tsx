@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import EditBookModal from "@/components/EditBookModal"
 
 type Book = {
   id?: string
@@ -24,6 +25,8 @@ export default function BooksPage() {
   const [loading, setLoading] = useState(true)
   const [fetchingPrices, setFetchingPrices] = useState<Set<number>>(new Set())
   const [isValidating, setIsValidating] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingBook, setEditingBook] = useState<Book | null>(null)
 
   // Initialize view mode from localStorage
   useEffect(() => {
@@ -132,6 +135,36 @@ export default function BooksPage() {
       }
     } catch (error) {
       alert("Error deleting book")
+    }
+  }
+
+  const handleEdit = (book: Book) => {
+    setEditingBook(book)
+    setEditModalOpen(true)
+  }
+
+  const handleEditSave = async (updatedBook: Book) => {
+    try {
+      const response = await fetch("/api/books/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedBook),
+      })
+
+      if (response.ok) {
+        const updatedBooks = books.map((book) =>
+          book.rowIndex === updatedBook.rowIndex ? updatedBook : book
+        )
+        setBooks(updatedBooks)
+        
+        // Update cache immediately
+        localStorage.setItem('bookLibrary_books', JSON.stringify(updatedBooks))
+        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+      } else {
+        alert("Failed to update book")
+      }
+    } catch (error) {
+      alert("Error updating book")
     }
   }
 
@@ -250,13 +283,27 @@ export default function BooksPage() {
           </a>
         </div>
       ) : viewMode === "grid" ? (
-        <GridView books={books} onDelete={handleDelete} />
+        <GridView books={books} onDelete={handleDelete} onEdit={handleEdit} />
       ) : (
         <TableView 
           books={books} 
-          onDelete={handleDelete} 
+          onDelete={handleDelete}
+          onEdit={handleEdit}
           onFetchPrice={handleFetchPrice}
           fetchingPrices={fetchingPrices}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editingBook && (
+        <EditBookModal
+          book={editingBook}
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false)
+            setEditingBook(null)
+          }}
+          onSave={handleEditSave}
         />
       )}
     </div>
@@ -266,9 +313,11 @@ export default function BooksPage() {
 function GridView({
   books,
   onDelete,
+  onEdit,
 }: {
   books: Book[]
   onDelete: (book: Book) => void
+  onEdit: (book: Book) => void
 }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
@@ -286,6 +335,25 @@ function GridView({
                 <div className="w-6 h-6 border border-muted-foreground"></div>
               </div>
             )}
+            <button
+              onClick={() => onEdit(book)}
+              className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
+              title="Edit"
+            >
+              <svg
+                className="w-3 h-3 text-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+            </button>
             <button
               onClick={() => onDelete(book)}
               className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
@@ -326,11 +394,13 @@ function GridView({
 function TableView({
   books,
   onDelete,
+  onEdit,
   onFetchPrice,
   fetchingPrices,
 }: {
   books: Book[]
   onDelete: (book: Book) => void
+  onEdit: (book: Book) => void
   onFetchPrice: (book: Book) => void
   fetchingPrices: Set<number>
 }) {
@@ -442,25 +512,46 @@ function TableView({
                 )}
               </td>
               <td className="py-4 px-2 text-right">
-                <button
-                  onClick={() => onDelete(book)}
-                  className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                  title="Delete"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex items-center justify-end space-x-1">
+                  <button
+                    onClick={() => onEdit(book)}
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    title="Edit"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => onDelete(book)}
+                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                    title="Delete"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

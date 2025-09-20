@@ -438,3 +438,15 @@ export async function deleteBook(sheetId: string, rowIndex: number) {
     },
   })
 }
+
+export async function updateBook(sheetId: string, rowIndex: number, values: any[]) {
+  const sheets = await getSheets()
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `Sheet1!A${rowIndex + 1}:L${rowIndex + 1}`, // A:L range for row (1-based)
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [values], // array of values to update the row
+    },
+  })
+}
