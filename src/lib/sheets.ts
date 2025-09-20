@@ -14,7 +14,7 @@ export async function getBooks(sheetId: string) {
   const sheets = await getSheets()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:L", // Covers all columns including URL
+    range: "Sheet1!A:O", // Covers all columns including notforsale
   })
 
   const rows = res.data.values || []
@@ -293,6 +293,23 @@ export async function searchBooks(
         // Use original thumbnail URL - no validation needed for search
         const coverUrl = volumeInfo.imageLinks?.thumbnail
 
+        // Extract language from metadata
+        const language =
+          volumeInfo.language ||
+          (volumeInfo.language === "en"
+            ? "English"
+            : volumeInfo.language === "nl"
+            ? "Dutch"
+            : volumeInfo.language === "de"
+            ? "German"
+            : volumeInfo.language === "fr"
+            ? "French"
+            : volumeInfo.language === "es"
+            ? "Spanish"
+            : volumeInfo.language === "it"
+            ? "Italian"
+            : volumeInfo.language || "Unknown")
+
         const bookResult = {
           id: item.id,
           title: volumeInfo.title,
@@ -302,6 +319,7 @@ export async function searchBooks(
           isbn: isbn,
           coverUrl: coverUrl,
           description: volumeInfo.description,
+          language: language,
           source: "Google Books",
           price: null as string | null,
           url: null as string | null,
@@ -339,6 +357,23 @@ export async function searchBooks(
             coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
           }
 
+          // Extract language from metadata (Open Library uses language codes)
+          const language =
+            doc.language?.[0] ||
+            (doc.language?.includes("eng")
+              ? "English"
+              : doc.language?.includes("dut") || doc.language?.includes("nld")
+              ? "Dutch"
+              : doc.language?.includes("ger") || doc.language?.includes("deu")
+              ? "German"
+              : doc.language?.includes("fre") || doc.language?.includes("fra")
+              ? "French"
+              : doc.language?.includes("spa")
+              ? "Spanish"
+              : doc.language?.includes("ita")
+              ? "Italian"
+              : "Unknown")
+
           const bookResult = {
             id: doc.key,
             title: doc.title,
@@ -347,6 +382,7 @@ export async function searchBooks(
             year: doc.first_publish_year?.toString(),
             isbn: isbn,
             coverUrl: coverUrl,
+            language: language,
             source: "Open Library",
             price: null as string | null,
             url: null as string | null,
@@ -380,6 +416,7 @@ export async function searchBooks(
             year: book.date_published?.split("-")[0], // Extract year
             isbn: book.isbn13,
             coverUrl: book.image,
+            language: book.language || "Unknown",
             source: "ISBN DB",
             price: null as string | null,
             url: null as string | null,
@@ -430,7 +467,7 @@ export async function addBook(sheetId: string, values: any[]) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:L", // adjust to your column range
+    range: "Sheet1!A:O", // adjust to your column range
     valueInputOption: "RAW",
     requestBody: {
       values: [values], // e.g. ["4", "9780140449266", "The Odyssey", "Homer", "book"]
@@ -467,7 +504,7 @@ export async function updateBook(
   const sheets = await getSheets()
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: `Sheet1!A${rowIndex + 1}:L${rowIndex + 1}`, // A:L range for row (1-based)
+    range: `Sheet1!A${rowIndex + 1}:O${rowIndex + 1}`, // A:O range for row (1-based)
     valueInputOption: "RAW",
     requestBody: {
       values: [values], // array of values to update the row

@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Convert book data to array format matching sheet columns (A:L)
+    // Convert book data to array format matching sheet columns (A:O)
     const values = [
       bookData.id || "",
       bookData.isbn || "",
@@ -34,6 +34,9 @@ export async function PUT(request: NextRequest) {
       bookData.notes || "",
       bookData.price || "",
       bookData.url || "",
+      bookData.language || "",
+      bookData.sellingprice || "",
+      bookData.notforsale ? "TRUE" : "FALSE",
     ]
 
     await updateBook(sheetId, rowIndex, values)

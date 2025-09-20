@@ -1,8 +1,10 @@
 "use client"
 import { useEffect, useState } from "react"
+import { useAuth } from "@/contexts/AuthContext"
 import EditBookModal from "@/components/EditBookModal"
 import AddBookModal from "@/components/AddBookModal"
 import SearchBooksModal from "@/components/SearchBooksModal"
+import LoginModal from "@/components/LoginModal"
 
 type Book = {
   id?: string
@@ -16,12 +18,16 @@ type Book = {
   publisher?: string
   year?: string
   url?: string
+  language?: string
+  sellingprice?: string
+  notforsale?: boolean
   rowIndex: number
 }
 
 type ViewMode = "grid" | "table"
 
 export default function BooksPage() {
+  const { isAuthenticated, logout } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [loading, setLoading] = useState(true)
@@ -31,6 +37,7 @@ export default function BooksPage() {
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
   // Initialize view mode from localStorage
   useEffect(() => {
@@ -315,27 +322,48 @@ export default function BooksPage() {
               <span>Updating...</span>
             </div>
           )}
-          <div className="flex items-center space-x-3">
+          {isAuthenticated && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setSearchModalOpen(true)}
+                className="px-4 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+              >
+                Search Books
+              </button>
+              <button
+                onClick={() => setAddModalOpen(true)}
+                className="px-4 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+              >
+                Add Manually
+              </button>
+            </div>
+          )}
+          {isAuthenticated ? (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={clearCache}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Refresh library data"
+              >
+                ↻ Refresh
+              </button>
+              <button
+                onClick={logout}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                title="Logout"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => setSearchModalOpen(true)}
-              className="px-4 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+              onClick={clearCache}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Refresh library data"
             >
-              Search Books
+              ↻ Refresh
             </button>
-            <button
-              onClick={() => setAddModalOpen(true)}
-              className="px-4 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
-            >
-              Add Manually
-            </button>
-          </div>
-          <button
-            onClick={clearCache}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            title="Refresh library data"
-          >
-            ↻ Refresh
-          </button>
+          )}
           <div className="flex items-center space-x-1">
             <button
               onClick={() => handleViewModeChange("grid")}
@@ -361,43 +389,58 @@ export default function BooksPage() {
         </div>
       </div>
 
-      {books.length === 0 ? (
-        <div className="text-center py-24">
-          <h3 className="text-2xl font-light text-foreground mb-3">
-            No books yet
-          </h3>
-          <p className="text-muted-foreground mb-8 font-light">
-            Start building your collection
-          </p>
-          <div className="flex items-center justify-center space-x-4">
-            <button
-              onClick={() => setSearchModalOpen(true)}
-              className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
-            >
-              Search Books
-            </button>
-            <button
-              onClick={() => setAddModalOpen(true)}
-              className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
-            >
-              Add Manually
-            </button>
+      {/* Filter books based on authentication */}
+      {(() => {
+        const filteredBooks = isAuthenticated
+          ? books
+          : books.filter((book) => !book.notforsale)
+
+        return filteredBooks.length === 0 ? (
+          <div className="text-center py-24">
+            <h3 className="text-2xl font-light text-foreground mb-3">
+              No books yet
+            </h3>
+            <p className="text-muted-foreground mb-8 font-light">
+              Start building your collection
+            </p>
+            {isAuthenticated && (
+              <div className="flex items-center justify-center space-x-4">
+                <button
+                  onClick={() => setSearchModalOpen(true)}
+                  className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+                >
+                  Search Books
+                </button>
+                <button
+                  onClick={() => setAddModalOpen(true)}
+                  className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+                >
+                  Add Manually
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      ) : viewMode === "grid" ? (
-        <GridView books={books} onDelete={handleDelete} onEdit={handleEdit} />
-      ) : (
-        <TableView
-          books={books}
-          onDelete={handleDelete}
-          onEdit={handleEdit}
-          onFetchPrice={handleFetchPrice}
-          fetchingPrices={fetchingPrices}
-        />
-      )}
+        ) : viewMode === "grid" ? (
+          <GridView
+            books={filteredBooks}
+            onDelete={handleDelete}
+            onEdit={handleEdit}
+            isAuthenticated={isAuthenticated}
+          />
+        ) : (
+          <TableView
+            books={filteredBooks}
+            onDelete={handleDelete}
+            onEdit={handleEdit}
+            onFetchPrice={handleFetchPrice}
+            fetchingPrices={fetchingPrices}
+            isAuthenticated={isAuthenticated}
+          />
+        )
+      })()}
 
       {/* Edit Modal */}
-      {editingBook && (
+      {editingBook && isAuthenticated && (
         <EditBookModal
           book={editingBook}
           isOpen={editModalOpen}
@@ -410,18 +453,51 @@ export default function BooksPage() {
       )}
 
       {/* Add Manual Book Modal */}
-      <AddBookModal
-        isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onSave={handleManualAdd}
-      />
+      {isAuthenticated && (
+        <AddBookModal
+          isOpen={addModalOpen}
+          onClose={() => setAddModalOpen(false)}
+          onSave={handleManualAdd}
+        />
+      )}
 
       {/* Search Books Modal */}
-      <SearchBooksModal
-        isOpen={searchModalOpen}
-        onClose={() => setSearchModalOpen(false)}
-        onBookAdded={handleBookAdded}
+      {isAuthenticated && (
+        <SearchBooksModal
+          isOpen={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          onBookAdded={handleBookAdded}
+        />
+      )}
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
       />
+
+      {/* Fixed Login Button */}
+      {!isAuthenticated && (
+        <button
+          onClick={() => setLoginModalOpen(true)}
+          className="fixed bottom-6 right-6 w-12 h-12 bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-full flex items-center justify-center shadow-lg z-40"
+          title="Admin Login"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
@@ -430,10 +506,12 @@ function GridView({
   books,
   onDelete,
   onEdit,
+  isAuthenticated,
 }: {
   books: Book[]
   onDelete: (book: Book) => void
   onEdit: (book: Book) => void
+  isAuthenticated: boolean
 }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
@@ -451,44 +529,48 @@ function GridView({
                 <div className="w-6 h-6 border border-muted-foreground"></div>
               </div>
             )}
-            <button
-              onClick={() => onEdit(book)}
-              className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
-              title="Edit"
-            >
-              <svg
-                className="w-3 h-3 text-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={() => onDelete(book)}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
-              title="Delete"
-            >
-              <svg
-                className="w-3 h-3 text-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            {isAuthenticated && (
+              <>
+                <button
+                  onClick={() => onEdit(book)}
+                  className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
+                  title="Edit"
+                >
+                  <svg
+                    className="w-3 h-3 text-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onDelete(book)}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-background rounded-sm p-1"
+                  title="Delete"
+                >
+                  <svg
+                    className="w-3 h-3 text-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
           <div>
             <h3 className="font-normal text-sm text-foreground line-clamp-2 mb-1">
@@ -513,12 +595,14 @@ function TableView({
   onEdit,
   onFetchPrice,
   fetchingPrices,
+  isAuthenticated,
 }: {
   books: Book[]
   onDelete: (book: Book) => void
   onEdit: (book: Book) => void
   onFetchPrice: (book: Book) => void
   fetchingPrices: Set<number>
+  isAuthenticated: boolean
 }) {
   return (
     <div className="w-full">
@@ -543,15 +627,32 @@ function TableView({
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
               ISBN
             </th>
+            {isAuthenticated && (
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+                Price
+              </th>
+            )}
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
-              Price
+              Language
             </th>
+            {isAuthenticated && (
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+                Selling Price
+              </th>
+            )}
+            {isAuthenticated && (
+              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
+                Not for Sale
+              </th>
+            )}
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground">
               Link
             </th>
-            <th className="text-right py-4 px-2 font-normal text-sm text-muted-foreground">
-              Actions
-            </th>
+            {isAuthenticated && (
+              <th className="text-right py-4 px-2 font-normal text-sm text-muted-foreground">
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -597,21 +698,44 @@ function TableView({
               <td className="py-4 px-2 text-sm text-muted-foreground font-mono">
                 {book.isbn || "—"}
               </td>
-              <td className="py-4 px-2 text-sm">
-                {book.price ? (
-                  <span className="text-foreground">{book.price}</span>
-                ) : book.isbn ? (
-                  <button
-                    onClick={() => onFetchPrice(book)}
-                    disabled={fetchingPrices.has(book.rowIndex)}
-                    className="text-xs px-2 py-1 bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] rounded-sm disabled:opacity-50"
-                  >
-                    {fetchingPrices.has(book.rowIndex) ? "..." : "Get Price"}
-                  </button>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+              {isAuthenticated && (
+                <td className="py-4 px-2 text-sm">
+                  {book.price ? (
+                    <span className="text-foreground">{book.price}</span>
+                  ) : book.isbn ? (
+                    <button
+                      onClick={() => onFetchPrice(book)}
+                      disabled={fetchingPrices.has(book.rowIndex)}
+                      className="text-xs px-2 py-1 bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] rounded-sm disabled:opacity-50"
+                    >
+                      {fetchingPrices.has(book.rowIndex) ? "..." : "Get Price"}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              )}
+              <td className="py-4 px-2 text-sm text-muted-foreground">
+                {book.language || "—"}
               </td>
+              {isAuthenticated && (
+                <td className="py-4 px-2 text-sm text-muted-foreground">
+                  {book.sellingprice || "—"}
+                </td>
+              )}
+              {isAuthenticated && (
+                <td className="py-4 px-2 text-sm">
+                  <span
+                    className={`px-2 py-1 text-xs rounded-sm ${
+                      book.notforsale
+                        ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                        : "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                    }`}
+                  >
+                    {book.notforsale ? "Not for Sale" : "For Sale"}
+                  </span>
+                </td>
+              )}
               <td className="py-4 px-2 text-sm">
                 {book.url ? (
                   <a
@@ -627,48 +751,50 @@ function TableView({
                   <span className="text-muted-foreground">—</span>
                 )}
               </td>
-              <td className="py-4 px-2 text-right">
-                <div className="flex items-center justify-end space-x-1">
-                  <button
-                    onClick={() => onEdit(book)}
-                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                    title="Edit"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+              {isAuthenticated && (
+                <td className="py-4 px-2 text-right">
+                  <div className="flex items-center justify-end space-x-1">
+                    <button
+                      onClick={() => onEdit(book)}
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                      title="Edit"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => onDelete(book)}
-                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                    title="Delete"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => onDelete(book)}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      title="Delete"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </td>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

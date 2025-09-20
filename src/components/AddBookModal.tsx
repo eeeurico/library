@@ -16,6 +16,9 @@ type NewBook = {
   year?: string
   url?: string
   edition?: string
+  language?: string
+  sellingprice?: string
+  notforsale?: boolean
 }
 
 interface AddBookModalProps {
@@ -93,6 +96,9 @@ export default function AddBookModal({
     notes: "",
     price: "",
     url: "",
+    language: "",
+    sellingprice: "",
+    notforsale: false,
   })
   const [isUploading, setIsUploading] = useState(false)
 
@@ -121,6 +127,9 @@ export default function AddBookModal({
       notes: "",
       price: "",
       url: "",
+      language: "",
+      sellingprice: "",
+      notforsale: false,
     })
     onClose()
   }
@@ -139,6 +148,9 @@ export default function AddBookModal({
       notes: "",
       price: "",
       url: "",
+      language: "",
+      sellingprice: "",
+      notforsale: false,
     })
     onClose()
   }
@@ -326,6 +338,43 @@ export default function AddBookModal({
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Language
+              </label>
+              <select
+                value={formData.language || ""}
+                onChange={(e) => handleInputChange("language", e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+              >
+                <option value="">Select language</option>
+                <option value="English">English</option>
+                <option value="Dutch">Dutch</option>
+                <option value="German">German</option>
+                <option value="French">French</option>
+                <option value="Spanish">Spanish</option>
+                <option value="Italian">Italian</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Selling Price
+              </label>
+              <input
+                type="text"
+                value={formData.sellingprice || ""}
+                onChange={(e) =>
+                  handleInputChange("sellingprice", e.target.value)
+                }
+                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                placeholder="€25.00 (price you sell for)"
+              />
+            </div>
+
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-foreground mb-2">
                 URL
@@ -351,6 +400,25 @@ export default function AddBookModal({
               className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors resize-vertical"
               placeholder="Add notes about this book, zine, or edition..."
             />
+          </div>
+
+          <div>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.notforsale || false}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    notforsale: e.target.checked,
+                  }))
+                }
+                className="w-4 h-4 text-blue-600 bg-background border-border rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <span className="text-sm font-medium text-foreground">
+                Not for sale (hide from public library)
+              </span>
+            </label>
           </div>
         </div>
 

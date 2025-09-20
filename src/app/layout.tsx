@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import Link from "next/link"
+import { AuthProvider } from "@/contexts/AuthContext"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -28,9 +29,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased`}
       >
-        <main className="flex-1">
-          <div className="w-full px-6 py-8">{children}</div>
-        </main>
+        <AuthProvider>
+          <main className="flex-1">
+            <div className="w-full px-6 py-8">{children}</div>
+          </main>
+        </AuthProvider>
       </body>
     </html>
   )
