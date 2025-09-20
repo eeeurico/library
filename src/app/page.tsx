@@ -696,7 +696,7 @@ function TableView({
                   </div>
                 )}
               </td>
-              <td className="py-4 px-2 text-sm text-muted-foreground">
+              <td className="py-4 px-2 text-sm text-muted-foreground overflow-ellipsis whitespace-nowrap max-w-[200px] relative overflow-hidden">
                 {book.author || "Unknown"}
               </td>
               <td className="py-4 px-2 text-sm text-muted-foreground">
