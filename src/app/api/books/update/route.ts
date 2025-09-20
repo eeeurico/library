@@ -5,7 +5,7 @@ export async function PUT(request: NextRequest) {
   try {
     const requestData = await request.json()
     console.log("Update request data:", requestData)
-    
+
     const { rowIndex, ...bookData } = requestData
 
     if (typeof rowIndex !== "number") {
@@ -54,7 +54,10 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     console.error("Error updating book:", error)
     return NextResponse.json(
-      { error: "Failed to update book", details: error instanceof Error ? error.message : String(error) },
+      {
+        error: "Failed to update book",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     )
   }

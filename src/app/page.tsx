@@ -198,7 +198,9 @@ export default function BooksPage() {
       } else {
         const errorData = await response.json().catch(() => ({}))
         console.error("Update failed:", response.status, errorData)
-        throw new Error(errorData.error || `Failed to update book (${response.status})`)
+        throw new Error(
+          errorData.error || `Failed to update book (${response.status})`
+        )
       }
     } catch (error) {
       console.error("Error updating book:", error)

@@ -357,12 +357,13 @@ export default function AddBookModal({
               >
                 <option value="">Select language</option>
                 <option value="English">English</option>
+                <option value="Korean">Korean</option>
+                <option value="Portuguese">Portuguese</option>
                 <option value="Dutch">Dutch</option>
                 <option value="German">German</option>
                 <option value="French">French</option>
                 <option value="Spanish">Spanish</option>
                 <option value="Italian">Italian</option>
-                <option value="Portuguese">Portuguese</option>
                 <option value="Japanese">Japanese</option>
                 <option value="Other">Other</option>
               </select>
