@@ -63,13 +63,17 @@ export default function SearchPage() {
           publisher: book.publisher,
           year: book.year,
           coverUrl: book.coverUrl,
-          price: book.price || "",
+          price: "", // Empty price, will be fetched on-demand
           url: book.url || "",
           type: "book",
         }),
       })
 
-      if (response.ok) {
+            if (response.ok) {
+        // Clear the books cache so it refreshes on next visit
+        localStorage.removeItem('bookLibrary_books')
+        localStorage.removeItem('bookLibrary_books_timestamp')
+        
         alert(`"${book.title}" has been added to your library!`)
       } else {
         const error = await response.json()
@@ -151,11 +155,6 @@ export default function SearchPage() {
                 {book.isbn && (
                   <p className="text-sm text-muted-foreground font-mono">
                     {book.isbn}
-                  </p>
-                )}
-                {book.price && (
-                  <p className="text-sm font-medium text-green-400">
-                    Dutch price: {book.price}
                   </p>
                 )}
                 {book.url && (

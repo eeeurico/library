@@ -22,15 +22,92 @@ export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [loading, setLoading] = useState(true)
+  const [fetchingPrices, setFetchingPrices] = useState<Set<number>>(new Set())
+  const [isValidating, setIsValidating] = useState(false)
+
+  // Initialize view mode from localStorage
+  useEffect(() => {
+    const savedViewMode = localStorage.getItem('bookLibrary_viewMode') as ViewMode
+    if (savedViewMode && (savedViewMode === 'grid' || savedViewMode === 'table')) {
+      setViewMode(savedViewMode)
+    }
+  }, [])
+
+  // Save view mode to localStorage when it changes
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem('bookLibrary_viewMode', mode)
+  }
 
   useEffect(() => {
-    fetch("/api/books")
-      .then((res) => res.json())
-      .then((data) => {
+    const loadBooks = async () => {
+      try {
+        // Try to load from localStorage first
+        const cachedBooks = localStorage.getItem('bookLibrary_books')
+        const cacheTimestamp = localStorage.getItem('bookLibrary_books_timestamp')
+        const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity
+        const cacheMaxAge = 5 * 60 * 1000 // 5 minutes
+
+        if (cachedBooks && cacheAge < cacheMaxAge) {
+          // Use cached data immediately
+          const parsedBooks = JSON.parse(cachedBooks)
+          setBooks(parsedBooks)
+          setLoading(false)
+
+          // Validate in background if cache is older than 1 minute
+          if (cacheAge > 60 * 1000) {
+            setIsValidating(true)
+            validateAndUpdateBooks(parsedBooks)
+          }
+        } else {
+          // Fetch fresh data
+          await fetchFreshBooks()
+        }
+      } catch (error) {
+        console.error('Error loading books:', error)
+        // Fallback to fresh fetch
+        await fetchFreshBooks()
+      }
+    }
+
+    const fetchFreshBooks = async () => {
+      try {
+        const res = await fetch("/api/books")
+        const data = await res.json()
         setBooks(data)
+        
+        // Cache the data
+        localStorage.setItem('bookLibrary_books', JSON.stringify(data))
+        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+      } catch (error) {
+        console.error('Error fetching fresh books:', error)
+      } finally {
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
+        setIsValidating(false)
+      }
+    }
+
+    const validateAndUpdateBooks = async (cachedBooks: Book[]) => {
+      try {
+        const res = await fetch("/api/books")
+        const freshData = await res.json()
+        
+        // Compare with cached data
+        const dataChanged = JSON.stringify(cachedBooks) !== JSON.stringify(freshData)
+        
+        if (dataChanged) {
+          setBooks(freshData)
+          localStorage.setItem('bookLibrary_books', JSON.stringify(freshData))
+          localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
+        }
+      } catch (error) {
+        console.error('Error validating books:', error)
+      } finally {
+        setIsValidating(false)
+      }
+    }
+
+    loadBooks()
   }, [])
 
   const handleDelete = async (book: Book) => {
@@ -44,13 +121,57 @@ export default function BooksPage() {
       })
 
       if (response.ok) {
-        setBooks(books.filter((b) => b.rowIndex !== book.rowIndex))
+        const updatedBooks = books.filter((b) => b.rowIndex !== book.rowIndex)
+        setBooks(updatedBooks)
+        
+        // Update cache immediately
+        localStorage.setItem('bookLibrary_books', JSON.stringify(updatedBooks))
+        localStorage.setItem('bookLibrary_books_timestamp', Date.now().toString())
       } else {
         alert("Failed to delete book")
       }
     } catch (error) {
       alert("Error deleting book")
     }
+  }
+
+  const handleFetchPrice = async (book: Book) => {
+    if (!book.isbn || !book.title) return
+    
+    setFetchingPrices(prev => new Set([...prev, book.rowIndex]))
+    
+    try {
+      const response = await fetch(
+        `/api/books/price?isbn=${encodeURIComponent(book.isbn)}&title=${encodeURIComponent(book.title)}`
+      )
+      const data = await response.json()
+      
+      if (response.ok && data.price) {
+        // Update the book in the local state
+        setBooks(prevBooks => 
+          prevBooks.map(b => 
+            b.rowIndex === book.rowIndex 
+              ? { ...b, price: data.price }
+              : b
+          )
+        )
+      }
+    } catch (error) {
+      console.error("Failed to fetch price:", error)
+    } finally {
+      setFetchingPrices(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(book.rowIndex)
+        return newSet
+      })
+    }
+  }
+
+  // Utility function to clear cache manually if needed
+  const clearCache = () => {
+    localStorage.removeItem('bookLibrary_books')
+    localStorage.removeItem('bookLibrary_books_timestamp')
+    window.location.reload()
   }
 
   if (loading) {
@@ -75,9 +196,22 @@ export default function BooksPage() {
         </div>
 
         <div className="flex items-center space-x-6">
+          {isValidating && (
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
+              <span>Updating...</span>
+            </div>
+          )}
+          <button
+            onClick={clearCache}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Refresh library data"
+          >
+            ↻ Refresh
+          </button>
           <div className="flex items-center space-x-1">
             <button
-              onClick={() => setViewMode("grid")}
+              onClick={() => handleViewModeChange("grid")}
               className={`px-4 py-2 text-sm font-normal transition-all ${
                 viewMode === "grid"
                   ? "text-foreground border-b border-foreground"
@@ -87,7 +221,7 @@ export default function BooksPage() {
               Grid
             </button>
             <button
-              onClick={() => setViewMode("table")}
+              onClick={() => handleViewModeChange("table")}
               className={`px-4 py-2 text-sm font-normal transition-all ${
                 viewMode === "table"
                   ? "text-foreground border-b border-foreground"
@@ -118,7 +252,12 @@ export default function BooksPage() {
       ) : viewMode === "grid" ? (
         <GridView books={books} onDelete={handleDelete} />
       ) : (
-        <TableView books={books} onDelete={handleDelete} />
+        <TableView 
+          books={books} 
+          onDelete={handleDelete} 
+          onFetchPrice={handleFetchPrice}
+          fetchingPrices={fetchingPrices}
+        />
       )}
     </div>
   )
@@ -187,9 +326,13 @@ function GridView({
 function TableView({
   books,
   onDelete,
+  onFetchPrice,
+  fetchingPrices,
 }: {
   books: Book[]
   onDelete: (book: Book) => void
+  onFetchPrice: (book: Book) => void
+  fetchingPrices: Set<number>
 }) {
   return (
     <div className="w-full">
@@ -268,8 +411,20 @@ function TableView({
               <td className="py-4 px-2 text-sm text-muted-foreground font-mono">
                 {book.isbn || "—"}
               </td>
-              <td className="py-4 px-2 text-sm text-foreground">
-                {book.price || "—"}
+              <td className="py-4 px-2 text-sm">
+                {book.price ? (
+                  <span className="text-foreground">{book.price}</span>
+                ) : book.isbn ? (
+                  <button
+                    onClick={() => onFetchPrice(book)}
+                    disabled={fetchingPrices.has(book.rowIndex)}
+                    className="text-xs px-2 py-1 bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] rounded-sm disabled:opacity-50"
+                  >
+                    {fetchingPrices.has(book.rowIndex) ? "..." : "Get Price"}
+                  </button>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </td>
               <td className="py-4 px-2 text-sm">
                 {book.url ? (

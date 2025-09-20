@@ -273,14 +273,8 @@ export async function searchBooks(
           (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
         )?.identifier
 
-        // Get better quality cover image
-        let coverUrl = volumeInfo.imageLinks?.thumbnail
-        if (coverUrl) {
-          coverUrl = coverUrl.replace('&edge=curl', '').replace('zoom=1', 'zoom=2')
-        }
-        
-        // Validate and get the best available cover image
-        const validatedCoverUrl = await validateCoverImage(coverUrl, isbn)
+        // Use original thumbnail URL - no validation needed for search
+        const coverUrl = volumeInfo.imageLinks?.thumbnail
 
         const bookResult = {
           id: item.id,
@@ -289,7 +283,7 @@ export async function searchBooks(
           publisher: volumeInfo.publisher,
           year: volumeInfo.publishedDate?.split('-')[0], // Extract just the year
           isbn: isbn,
-          coverUrl: validatedCoverUrl,
+          coverUrl: coverUrl,
           description: volumeInfo.description,
           source: "Google Books",
           price: null as string | null,
@@ -298,18 +292,6 @@ export async function searchBooks(
 
         // Generate the best URL for this book
         bookResult.url = generateBookUrls(bookResult)
-
-        // Try to get Dutch pricing if we have an ISBN
-        if (isbn) {
-          try {
-            const dutchPrice = await getDutchBookPrice(isbn, bookResult.title)
-            if (dutchPrice) {
-              bookResult.price = dutchPrice
-            }
-          } catch (error) {
-            console.log("Could not fetch Dutch pricing for", isbn)
-          }
-        }
 
         results.push(bookResult)
       }
@@ -332,16 +314,13 @@ export async function searchBooks(
         for (const doc of openLib.docs) {
           const isbn = doc.isbn?.[0]
           
-          // Better cover image handling
+          // Simple cover image handling - no validation for search
           let coverUrl
           if (isbn) {
-            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
           } else if (doc.cover_i) {
-            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
           }
-
-          // Validate the cover image
-          const validatedCoverUrl = await validateCoverImage(coverUrl, isbn)
 
           const bookResult = {
             id: doc.key,
@@ -350,7 +329,7 @@ export async function searchBooks(
             publisher: doc.publisher?.[0],
             year: doc.first_publish_year?.toString(),
             isbn: isbn,
-            coverUrl: validatedCoverUrl,
+            coverUrl: coverUrl,
             source: "Open Library",
             price: null as string | null,
             url: null as string | null,
@@ -358,18 +337,6 @@ export async function searchBooks(
 
           // Generate the best URL for this book
           bookResult.url = generateBookUrls(bookResult)
-
-          // Try to get Dutch pricing
-          if (isbn) {
-            try {
-              const dutchPrice = await getDutchBookPrice(isbn, bookResult.title)
-              if (dutchPrice) {
-                bookResult.price = dutchPrice
-              }
-            } catch (error) {
-              console.log("Could not fetch Dutch pricing for", isbn)
-            }
-          }
 
           results.push(bookResult)
         }
@@ -404,16 +371,6 @@ export async function searchBooks(
           // Generate the best URL for this book
           bookResult.url = generateBookUrls(bookResult)
 
-          // Try to get Dutch pricing
-          try {
-            const dutchPrice = await getDutchBookPrice(book.isbn13, book.title)
-            if (dutchPrice) {
-              bookResult.price = dutchPrice
-            }
-          } catch (error) {
-            console.log("Could not fetch Dutch pricing for", book.isbn13)
-          }
-
           results.push(bookResult)
         }
       } catch (error) {
@@ -442,6 +399,11 @@ export async function searchBooks(
 export async function getSheets() {
   const client = await auth.getClient()
   return google.sheets({ version: "v4", auth: client as any })
+}
+
+// Function to fetch Dutch pricing for a single book (on-demand)
+export async function fetchBookPrice(isbn: string, title: string): Promise<string | null> {
+  return await getDutchBookPrice(isbn, title)
 }
 
 export async function addBook(sheetId: string, values: any[]) {
