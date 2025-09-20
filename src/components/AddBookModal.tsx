@@ -1,5 +1,5 @@
 "use client"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { UploadDropzone } from "@uploadthing/react"
 import { useToast } from "./ToastProvider"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
@@ -104,6 +104,23 @@ export default function AddBookModal({
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown)
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen, onClose])
 
   const handleInputChange = (field: keyof NewBook, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))

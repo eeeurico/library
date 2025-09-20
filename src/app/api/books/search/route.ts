@@ -8,6 +8,9 @@ export async function GET(request: NextRequest) {
     const type =
       (searchParams.get("type") as "title" | "author" | "isbn" | "general") ||
       "general"
+    const source =
+      (searchParams.get("source") as "google" | "openlibrary" | "all") ||
+      "google"
 
     if (!query) {
       return NextResponse.json(
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const results = await searchBooks(query, type)
+    const results = await searchBooks(query, type, source)
 
     return NextResponse.json({ results, count: results.length })
   } catch (error) {

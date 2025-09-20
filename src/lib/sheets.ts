@@ -34,32 +34,58 @@ export async function getBooks(sheetId: string) {
 // Function to check if an image URL returns a valid image
 async function isValidImageUrl(url: string): Promise<boolean> {
   try {
-    const response = await fetch(url, { method: 'HEAD' })
-    const contentType = response.headers.get('content-type')
-    return response.ok && (contentType?.startsWith('image/') ?? false)
+    const response = await fetch(url, { method: "HEAD" })
+    const contentType = response.headers.get("content-type")
+    return response.ok && (contentType?.startsWith("image/") ?? false)
   } catch {
     return false
   }
 }
 
 // Function to get the best available cover image from multiple sources
-async function getBestCoverImage(isbn: string, title?: string, author?: string, googleUrl?: string): Promise<string | undefined> {
+// Enhanced version with proper cover image search
+export async function getBestCoverImage(
+  isbn?: string,
+  title?: string,
+  author?: string,
+  googleCoverUrl?: string
+): Promise<string | null> {
   // List of image sources to try in order of preference
   const imageSources = [
     // Google Books (if available)
-    googleUrl,
+    googleCoverUrl,
     // Open Library covers (multiple sizes)
-    `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
-    `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+    ...(isbn
+      ? [
+          `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+          `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+        ]
+      : []),
     // Amazon covers (if ISBN-10 available)
-    ...(isbn.length === 13 ? [
-      `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(isbn)}.01.L.jpg`,
-      `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(isbn)}.01.M.jpg`
-    ] : []),
+    ...(isbn && isbn.length === 13
+      ? [
+          `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(
+            isbn
+          )}.01.L.jpg`,
+          `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(
+            isbn
+          )}.01.M.jpg`,
+        ]
+      : []),
     // WorldCat covers
-    `https://www.worldcat.org/title/-/oclc-/covers/cover?isbn=${isbn}&size=L`,
+    ...(isbn
+      ? [
+          `https://www.worldcat.org/title/-/oclc-/covers/cover?isbn=${isbn}&size=L`,
+        ]
+      : []),
     // BookCover API
-    `https://bookcover.longitood.com/bookcover?book_title=${encodeURIComponent(title || '')}&author_name=${encodeURIComponent(author || '')}&size=large`,
+    ...(title && author
+      ? [
+          `https://bookcover.longitood.com/bookcover?book_title=${encodeURIComponent(
+            title
+          )}&author_name=${encodeURIComponent(author)}&size=large`,
+        ]
+      : []),
   ].filter(Boolean) as string[]
 
   // Try each source until we find a working image
@@ -69,25 +95,25 @@ async function getBestCoverImage(isbn: string, title?: string, author?: string, 
     }
   }
 
-  return undefined
+  return null
 }
 
 // Convert ISBN-13 to ISBN-10 for Amazon covers
 function convertToIsbn10(isbn13: string): string | null {
-  if (isbn13.length !== 13 || !isbn13.startsWith('978')) {
+  if (isbn13.length !== 13 || !isbn13.startsWith("978")) {
     return null
   }
-  
+
   const isbn9 = isbn13.substring(3, 12)
   let checksum = 0
-  
+
   for (let i = 0; i < 9; i++) {
     checksum += parseInt(isbn9[i]) * (10 - i)
   }
-  
+
   const check = (11 - (checksum % 11)) % 11
-  const checkDigit = check === 10 ? 'X' : check.toString()
-  
+  const checkDigit = check === 10 ? "X" : check.toString()
+
   return isbn9 + checkDigit
 }
 
@@ -100,10 +126,15 @@ export async function enrichBook(isbn: string) {
     const item = gb.items[0].volumeInfo
     const thumbnailUrl = item.imageLinks?.thumbnail
     const highResUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
-    
+
     // Try to get a better cover image if Google's is not available or low quality
-    const coverUrl = await getBestCoverImage(isbn, item.title, item.authors?.[0], highResUrl)
-    
+    const coverUrl = await getBestCoverImage(
+      isbn,
+      item.title,
+      item.authors?.[0],
+      highResUrl
+    )
+
     return {
       title: item.title,
       author: item.authors?.join(", "),
@@ -323,86 +354,100 @@ export function generateBookUrls(book: {
 
 export async function searchBooks(
   query: string,
-  type: "title" | "author" | "isbn" | "general" = "general"
+  type: "title" | "author" | "isbn" | "general" = "general",
+  source: "google" | "openlibrary" | "all" = "google"
 ) {
   const results: any[] = []
 
   try {
+    // Based on source parameter, decide which APIs to call
+    const shouldSearchGoogle = source === "google" || source === "all"
+    const shouldSearchOpenLibrary = source === "openlibrary" || source === "all"
+
     // 1. Search Google Books API
-    let googleQuery = ""
-    switch (type) {
-      case "title":
-        googleQuery = `intitle:${query}`
-        break
-      case "author":
-        googleQuery = `inauthor:${query}`
-        break
-      case "isbn":
-        googleQuery = `isbn:${query}`
-        break
-      default:
-        googleQuery = query
-    }
+    if (shouldSearchGoogle) {
+      let googleQuery = ""
+      switch (type) {
+        case "title":
+          googleQuery = `intitle:${query}`
+          break
+        case "author":
+          googleQuery = `inauthor:${query}`
+          break
+        case "isbn":
+          googleQuery = `isbn:${query}`
+          break
+        default:
+          googleQuery = query
+      }
 
-    const googleBooks = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-        googleQuery
-      )}&maxResults=10`
-    ).then((r) => r.json())
+      const googleBooks = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+          googleQuery
+        )}&maxResults=10`
+      ).then((r) => r.json())
 
-    if (googleBooks.items) {
-      for (const item of googleBooks.items) {
-        const volumeInfo = item.volumeInfo
-        const isbn = volumeInfo.industryIdentifiers?.find(
-          (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
-        )?.identifier
+      if (googleBooks.items) {
+        for (const item of googleBooks.items) {
+          const volumeInfo = item.volumeInfo
+          const isbn = volumeInfo.industryIdentifiers?.find(
+            (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
+          )?.identifier
 
-        // Get the best available cover image
-        const thumbnailUrl = volumeInfo.imageLinks?.thumbnail
-        const googleCoverUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
-        const coverUrl = await getBestCoverImage(isbn, volumeInfo.title, volumeInfo.authors?.[0], googleCoverUrl)
+          // Get the best available cover image
+          const thumbnailUrl = volumeInfo.imageLinks?.thumbnail
+          const googleCoverUrl = thumbnailUrl
+            ? `${thumbnailUrl}&zoom=2`
+            : undefined
+          const coverUrl = await getBestCoverImage(
+            isbn,
+            volumeInfo.title,
+            volumeInfo.authors?.[0],
+            googleCoverUrl
+          )
 
-        // Extract language from metadata
-        const language =
-          volumeInfo.language ||
-          (volumeInfo.language === "en"
-            ? "English"
-            : volumeInfo.language === "nl"
-            ? "Dutch"
-            : volumeInfo.language === "de"
-            ? "German"
-            : volumeInfo.language === "fr"
-            ? "French"
-            : volumeInfo.language === "es"
-            ? "Spanish"
-            : volumeInfo.language === "it"
-            ? "Italian"
-            : volumeInfo.language || "Unknown")
+          // Extract language from metadata
+          const language =
+            volumeInfo.language ||
+            (volumeInfo.language === "en"
+              ? "English"
+              : volumeInfo.language === "nl"
+              ? "Dutch"
+              : volumeInfo.language === "de"
+              ? "German"
+              : volumeInfo.language === "fr"
+              ? "French"
+              : volumeInfo.language === "es"
+              ? "Spanish"
+              : volumeInfo.language === "it"
+              ? "Italian"
+              : volumeInfo.language || "Unknown")
 
-        const bookResult = {
-          id: item.id,
-          title: volumeInfo.title,
-          author: volumeInfo.authors?.join(", ") || "Unknown Author",
-          publisher: volumeInfo.publisher,
-          year: volumeInfo.publishedDate?.split("-")[0], // Extract just the year
-          isbn: isbn,
-          coverUrl: coverUrl,
-          description: volumeInfo.description,
-          language: language,
-          source: "Google Books",
-          price: null as string | null,
-          url: null as string | null,
+          const bookResult = {
+            id: item.id,
+            title: volumeInfo.title,
+            author: volumeInfo.authors?.join(", ") || "Unknown Author",
+            publisher: volumeInfo.publisher,
+            year: volumeInfo.publishedDate?.split("-")[0], // Extract just the year
+            isbn: isbn,
+            coverUrl: coverUrl,
+            description: volumeInfo.description,
+            language: language,
+            source: "Google Books",
+            price: null as string | null,
+            url: null as string | null,
+          }
+
+          // Generate the best URL for this book
+          bookResult.url = generateBookUrls(bookResult)
+
+          results.push(bookResult)
         }
-
-        // Generate the best URL for this book
-        bookResult.url = generateBookUrls(bookResult)
-
-        results.push(bookResult)
       }
     }
 
     // 2. Search Open Library API
-    if (type !== "isbn") {
+    if (shouldSearchOpenLibrary && type !== "isbn") {
       const openLibQuery =
         type === "title"
           ? `title=${query}`
@@ -466,7 +511,7 @@ export async function searchBooks(
     }
 
     // 3. For ISBN searches, also try ISBN DB (free API)
-    if (type === "isbn") {
+    if (shouldSearchGoogle && type === "isbn") {
       try {
         const isbnDb = await fetch(`https://api.isbndb.com/book/${query}`, {
           headers: {

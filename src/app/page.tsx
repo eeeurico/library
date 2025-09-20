@@ -5,6 +5,7 @@ import { useToast } from "@/components/ToastProvider"
 import EditBookModal from "@/components/EditBookModal"
 import AddBookModal from "@/components/AddBookModal"
 import SearchBooksModal from "@/components/SearchBooksModal"
+import ImportBooksModal from "@/components/ImportBooksModal"
 import LoginModal from "@/components/LoginModal"
 
 type Book = {
@@ -39,8 +40,11 @@ export default function BooksPage() {
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
-  const [sortBy, setSortBy] = useState<"default" | "title-asc" | "title-desc">("default")
+  const [sortBy, setSortBy] = useState<"default" | "title-asc" | "title-desc">(
+    "default"
+  )
   const [quickSearch, setQuickSearch] = useState("")
 
   // Initialize view mode from localStorage
@@ -66,26 +70,30 @@ export default function BooksPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Focus search on Ctrl+K or Cmd+K
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault()
-        const searchInput = document.querySelector('input[placeholder="Quick search books..."]') as HTMLInputElement
+        const searchInput = document.querySelector(
+          'input[placeholder="Quick search books..."]'
+        ) as HTMLInputElement
         if (searchInput) {
           searchInput.focus()
           searchInput.select()
         }
       }
       // Focus search on "/" key (like GitHub)
-      if (e.key === '/' && e.target === document.body) {
+      if (e.key === "/" && e.target === document.body) {
         e.preventDefault()
-        const searchInput = document.querySelector('input[placeholder="Quick search books..."]') as HTMLInputElement
+        const searchInput = document.querySelector(
+          'input[placeholder="Quick search books..."]'
+        ) as HTMLInputElement
         if (searchInput) {
           searchInput.focus()
         }
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
   }, [])
 
   useEffect(() => {
@@ -374,6 +382,12 @@ export default function BooksPage() {
                 Search Books
               </button>
               <button
+                onClick={() => setImportModalOpen(true)}
+                className="px-4 py-2 text-sm font-normal bg-[rgba(45,96,45,0.5)] text-white hover:bg-[#3a7a3a] transition-colors rounded-sm cursor-pointer"
+              >
+                Import CSV
+              </button>
+              <button
                 onClick={() => setAddModalOpen(true)}
                 className="px-4 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm cursor-pointer"
               >
@@ -463,8 +477,18 @@ export default function BooksPage() {
                   onClick={() => setQuickSearch("")}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               )}
@@ -476,7 +500,11 @@ export default function BooksPage() {
             <span className="text-sm text-muted-foreground">Sort by:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "default" | "title-asc" | "title-desc")}
+              onChange={(e) =>
+                setSortBy(
+                  e.target.value as "default" | "title-asc" | "title-desc"
+                )
+              }
               className="px-3 py-2 text-sm bg-background border border-border rounded-sm text-foreground focus:outline-none focus:border-white transition-colors cursor-pointer"
             >
               <option value="default">Sheet Order</option>
@@ -497,21 +525,26 @@ export default function BooksPage() {
         // Apply quick search filter
         if (quickSearch.trim()) {
           const searchTerm = quickSearch.toLowerCase().trim()
-          filteredBooks = filteredBooks.filter((book) =>
-            book.title?.toLowerCase().includes(searchTerm) ||
-            book.author?.toLowerCase().includes(searchTerm) ||
-            book.isbn?.toLowerCase().includes(searchTerm) ||
-            book.publisher?.toLowerCase().includes(searchTerm)
+          filteredBooks = filteredBooks.filter(
+            (book) =>
+              book.title?.toLowerCase().includes(searchTerm) ||
+              book.author?.toLowerCase().includes(searchTerm) ||
+              book.isbn?.toLowerCase().includes(searchTerm) ||
+              book.publisher?.toLowerCase().includes(searchTerm)
           )
         }
 
         // Apply sorting
         switch (sortBy) {
           case "title-asc":
-            filteredBooks.sort((a, b) => (a.title || "").localeCompare(b.title || ""))
+            filteredBooks.sort((a, b) =>
+              (a.title || "").localeCompare(b.title || "")
+            )
             break
           case "title-desc":
-            filteredBooks.sort((a, b) => (b.title || "").localeCompare(a.title || ""))
+            filteredBooks.sort((a, b) =>
+              (b.title || "").localeCompare(a.title || "")
+            )
             break
           case "default":
           default:
@@ -545,45 +578,49 @@ export default function BooksPage() {
             {filteredBooks.length === 0 ? (
               <div className="text-center py-24">
                 <h3 className="text-2xl font-light text-foreground mb-3">
-                  {quickSearch.trim() ? `No books found for "${quickSearch}"` : "No books yet"}
+                  {quickSearch.trim()
+                    ? `No books found for "${quickSearch}"`
+                    : "No books yet"}
                 </h3>
                 <p className="text-muted-foreground mb-8 font-light">
-                  {quickSearch.trim() ? "Try a different search term" : "Start building your collection"}
+                  {quickSearch.trim()
+                    ? "Try a different search term"
+                    : "Start building your collection"}
                 </p>
-            {isAuthenticated && (
-              <div className="flex items-center justify-center space-x-4">
-                <button
-                  onClick={() => setSearchModalOpen(true)}
-                  className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm cursor-pointer"
-                >
-                  Search Books
-                </button>
-                <button
-                  onClick={() => setAddModalOpen(true)}
-                  className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm cursor-pointer"
-                >
-                  Add Manually
-                </button>
+                {isAuthenticated && (
+                  <div className="flex items-center justify-center space-x-4">
+                    <button
+                      onClick={() => setSearchModalOpen(true)}
+                      className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm cursor-pointer"
+                    >
+                      Search Books
+                    </button>
+                    <button
+                      onClick={() => setAddModalOpen(true)}
+                      className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm cursor-pointer"
+                    >
+                      Add Manually
+                    </button>
+                  </div>
+                )}
               </div>
+            ) : viewMode === "grid" ? (
+              <GridView
+                books={filteredBooks}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                isAuthenticated={isAuthenticated}
+              />
+            ) : (
+              <TableView
+                books={filteredBooks}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                onFetchPrice={handleFetchPrice}
+                fetchingPrices={fetchingPrices}
+                isAuthenticated={isAuthenticated}
+              />
             )}
-          </div>
-        ) : viewMode === "grid" ? (
-          <GridView
-            books={filteredBooks}
-            onDelete={handleDelete}
-            onEdit={handleEdit}
-            isAuthenticated={isAuthenticated}
-          />
-        ) : (
-          <TableView
-            books={filteredBooks}
-            onDelete={handleDelete}
-            onEdit={handleEdit}
-            onFetchPrice={handleFetchPrice}
-            fetchingPrices={fetchingPrices}
-            isAuthenticated={isAuthenticated}
-          />
-        )}
           </>
         )
       })()}
@@ -616,6 +653,15 @@ export default function BooksPage() {
           isOpen={searchModalOpen}
           onClose={() => setSearchModalOpen(false)}
           onBookAdded={handleBookAdded}
+        />
+      )}
+
+      {/* Import Books Modal */}
+      {isAuthenticated && (
+        <ImportBooksModal
+          isOpen={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          onBooksAdded={handleBookAdded}
         />
       )}
 

@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ToastProvider"
 
 type SearchResult = {
@@ -32,9 +32,29 @@ export default function SearchBooksModal({
   const [searchType, setSearchType] = useState<
     "general" | "title" | "author" | "isbn"
   >("general")
+  const [apiSource, setApiSource] = useState<"google" | "openlibrary" | "all">(
+    "google"
+  )
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen) {
+        handleClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown)
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +65,9 @@ export default function SearchBooksModal({
 
     try {
       const response = await fetch(
-        `/api/books/search?q=${encodeURIComponent(query)}&type=${searchType}`
+        `/api/books/search?q=${encodeURIComponent(
+          query
+        )}&type=${searchType}&source=${apiSource}`
       )
       const data = await response.json()
 
@@ -86,7 +108,7 @@ export default function SearchBooksModal({
         localStorage.removeItem("bookLibrary_books")
         localStorage.removeItem("bookLibrary_books_timestamp")
 
-        showToast(`"${book.title}" has been added to your library!`)
+        showToast(`"${book.title}" has been added to your library!`, "success")
 
         // Notify parent component that a book was added
         if (onBookAdded) {
@@ -110,6 +132,7 @@ export default function SearchBooksModal({
     setResults([])
     setError("")
     setSearchType("general")
+    setApiSource("google")
     onClose()
   }
 
@@ -162,6 +185,15 @@ export default function SearchBooksModal({
                 <option value="title">Title</option>
                 <option value="author">Author</option>
                 <option value="isbn">ISBN</option>
+              </select>
+              <select
+                value={apiSource}
+                onChange={(e) => setApiSource(e.target.value as any)}
+                className="flex h-10 w-36 rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:border-white transition-colors cursor-pointer"
+              >
+                <option value="google">Google Books</option>
+                <option value="openlibrary">Open Library</option>
+                <option value="all">All Sources</option>
               </select>
               <button
                 type="submit"
