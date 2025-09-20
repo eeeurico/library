@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import Link from "next/link"
 import { AuthProvider } from "@/contexts/AuthContext"
+import { ToastProvider } from "@/components/ToastProvider"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -30,7 +30,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased`}
       >
         <AuthProvider>
-          <main className="flex-1 w-full py-8">{children}</main>
+          <ToastProvider>
+            <main className="flex-1 w-full pt-8 pb-22">{children}</main>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

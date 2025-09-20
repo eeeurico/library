@@ -1,6 +1,7 @@
 "use client"
 import { useState, useCallback } from "react"
 import { UploadDropzone } from "@uploadthing/react"
+import { useToast } from "./ToastProvider"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
 
 type NewBook = {
@@ -84,6 +85,7 @@ export default function AddBookModal({
   onClose,
   onSave,
 }: AddBookModalProps) {
+  const { showToast } = useToast()
   const [formData, setFormData] = useState<NewBook>({
     title: "",
     author: "",
@@ -136,7 +138,7 @@ export default function AddBookModal({
       onClose()
     } catch (error) {
       console.error("Error saving book:", error)
-      alert("Failed to save book. Please try again.")
+      showToast("Failed to save book. Please try again.", "error")
     } finally {
       setIsSaving(false)
     }
@@ -175,7 +177,7 @@ export default function AddBookModal({
           </h2>
           <button
             onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <svg
               className="w-6 h-6"
@@ -221,7 +223,7 @@ export default function AddBookModal({
                   }}
                   onUploadError={(error: Error) => {
                     setIsUploading(false)
-                    alert(`Upload error: ${error.message}`)
+                    showToast(`Upload error: ${error.message}`, "error")
                   }}
                   onUploadBegin={() => {
                     setIsUploading(true)
@@ -437,7 +439,7 @@ export default function AddBookModal({
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-border">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+            className="px-4 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm cursor-pointer"
           >
             Cancel
           </button>
@@ -449,7 +451,7 @@ export default function AddBookModal({
               !formData.title.trim() ||
               !formData.author.trim()
             }
-            className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
+            className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50 cursor-pointer"
           >
             {isUploading ? "Uploading..." : isSaving ? "Adding..." : "Add Book"}
           </button>

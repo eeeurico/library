@@ -121,7 +121,7 @@ export default function SearchBooksModal({
           <h2 className="text-xl font-light text-foreground">Search Books</h2>
           <button
             onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <svg
               className="w-6 h-6"
@@ -164,7 +164,7 @@ export default function SearchBooksModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
+                className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50 cursor-pointer"
               >
                 {loading ? "Searching..." : "Search"}
               </button>
@@ -246,7 +246,7 @@ export default function SearchBooksModal({
                   )}
                   <button
                     onClick={() => handleAddBook(book)}
-                    className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm"
+                    className="inline-flex items-center justify-center px-6 py-2 text-sm font-normal bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm cursor-pointer"
                   >
                     Add to Library
                   </button>

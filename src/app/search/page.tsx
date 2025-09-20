@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { useToast } from "@/components/ToastProvider"
 
 type SearchResult = {
   id: string
@@ -16,6 +17,7 @@ type SearchResult = {
 }
 
 export default function SearchPage() {
+  const { showToast } = useToast()
   const [query, setQuery] = useState("")
   const [searchType, setSearchType] = useState<
     "general" | "title" | "author" | "isbn"
@@ -74,13 +76,13 @@ export default function SearchPage() {
         localStorage.removeItem("bookLibrary_books")
         localStorage.removeItem("bookLibrary_books_timestamp")
 
-        alert(`"${book.title}" has been added to your library!`)
+        showToast(`"${book.title}" has been added to your library!`, "success")
       } else {
         const error = await response.json()
-        alert(`Failed to add book: ${error.error}`)
+        showToast(`Failed to add book: ${error.error}`, "error")
       }
     } catch (err) {
-      alert("Failed to add book to library")
+      showToast("Failed to add book to library", "error")
     }
   }
 

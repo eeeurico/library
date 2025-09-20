@@ -1,6 +1,7 @@
 "use client"
 import { useState, useRef, useCallback } from "react"
 import { UploadDropzone } from "@uploadthing/react"
+import { useToast } from "./ToastProvider"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
 
 type Book = {
@@ -87,6 +88,7 @@ export default function EditBookModal({
   onClose,
   onSave,
 }: EditBookModalProps) {
+  const { showToast } = useToast()
   const [formData, setFormData] = useState<Book>(book)
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -100,7 +102,10 @@ export default function EditBookModal({
   const handleSave = async () => {
     // If upload is in progress, wait for it to complete
     if (isUploading) {
-      alert("Please wait for the image upload to complete before saving.")
+      showToast(
+        "Please wait for the image upload to complete before saving.",
+        "info"
+      )
       return
     }
 
@@ -110,7 +115,7 @@ export default function EditBookModal({
       onClose()
     } catch (error) {
       console.error("Error saving book:", error)
-      alert("Failed to save book changes. Please try again.")
+      showToast("Failed to save book changes. Please try again.", "error")
     } finally {
       setIsSaving(false)
     }
@@ -143,7 +148,7 @@ export default function EditBookModal({
       }
     } catch (error) {
       console.error("Upload failed:", error)
-      alert("Image upload failed. Please try again.")
+      showToast("Image upload failed. Please try again.", "error")
     } finally {
       setIsUploading(false)
       setUploadProgress(0)
@@ -160,7 +165,7 @@ export default function EditBookModal({
           <h2 className="text-xl font-light text-foreground">Edit Book</h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <svg
               className="w-6 h-6"
@@ -206,7 +211,7 @@ export default function EditBookModal({
                   }}
                   onUploadError={(error: Error) => {
                     setIsUploading(false)
-                    alert(`Upload error: ${error.message}`)
+                    showToast(`Upload error: ${error.message}`, "error")
                   }}
                   onUploadBegin={() => {
                     setIsUploading(true)
@@ -398,14 +403,14 @@ export default function EditBookModal({
         <div className="sticky bottom-0 z-10 bg-background flex items-center justify-end space-x-3 p-6 border-t border-border rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+            className="px-4 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isUploading || isSaving}
-            className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50"
+            className="px-6 py-2 text-sm bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] transition-colors rounded-sm disabled:opacity-50 cursor-pointer"
           >
             {isUploading
               ? "Uploading..."
