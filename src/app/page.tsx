@@ -25,6 +25,24 @@ type Book = {
   forsale?: boolean | string // Can be boolean or "TRUE"/"FALSE" string from Google Sheets
 }
 
+type NewBook = {
+  id?: string
+  isbn?: string
+  title: string
+  author: string
+  type?: string
+  coverUrl?: string
+  notes?: string
+  price?: string
+  publisher?: string
+  year?: string
+  url?: string
+  edition?: string
+  language?: string
+  sellingprice?: string
+  forsale?: boolean | string
+}
+
 type ViewMode = "grid" | "table"
 
 export default function BooksPage() {
@@ -265,7 +283,7 @@ export default function BooksPage() {
     }
   }
 
-  const handleManualAdd = async (newBook: any): Promise<void> => {
+  const handleManualAdd = async (newBook: NewBook): Promise<void> => {
     try {
       // Generate the next available ID
       const nextId =

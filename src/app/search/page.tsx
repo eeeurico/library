@@ -103,7 +103,11 @@ export default function SearchPage() {
           />
           <select
             value={searchType}
-            onChange={(e) => setSearchType(e.target.value as any)}
+            onChange={(e) =>
+              setSearchType(
+                e.target.value as "general" | "title" | "author" | "isbn"
+              )
+            }
             className="flex h-10 w-32 rounded-sm border border-[#282828] bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:border-white transition-colors cursor-pointer"
           >
             <option value="general">General</option>
@@ -201,7 +205,7 @@ export default function SearchPage() {
 
       {results.length === 0 && !loading && query && (
         <div className="text-center text-muted-foreground py-12">
-          No books found for "{query}"
+          No books found for &quot;{query}&quot;
         </div>
       )}
     </div>

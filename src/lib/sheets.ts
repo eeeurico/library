@@ -1,6 +1,25 @@
 import { google } from "googleapis"
 import { uploadBestAvailableImage } from "./uploadUtils"
 
+type Book = {
+  id?: string
+  isbn?: string | null
+  title?: string | null
+  author?: string | null
+  type?: string | null
+  coverUrl?: string | null
+  notes?: string | null
+  price?: string | null
+  publisher?: string | null
+  year?: string | null
+  url?: string | null
+  edition?: string | null
+  language?: string | null
+  sellingprice?: string | null
+  forsale?: boolean | string | null
+  _sheetRowIndex?: number
+}
+
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 const auth = new google.auth.GoogleAuth({
@@ -44,7 +63,7 @@ export function generateBookId(
     : `book-${timestamp}-${random}`
 }
 
-export async function getBooks(sheetId: string) {
+export async function getBooks(sheetId: string): Promise<Book[]> {
   const sheets = await getSheets()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
@@ -56,10 +75,10 @@ export async function getBooks(sheetId: string) {
 
   // First row is header, skip it
   const headers = rows[0]
-  const books: any[] = []
+  const books: Book[] = []
 
   rows.slice(1).forEach((row, i) => {
-    let book: Record<string, any> = {}
+    const book: Record<string, string> = {}
     headers.forEach((h, j) => {
       book[h] = row[j] || "" // assign each column
     })
@@ -79,7 +98,7 @@ export async function getBooks(sheetId: string) {
       }
 
       // Store sheet position for legacy operations that might still need it
-      book._sheetRowIndex = i + 2 // +2 because: +1 for header row, +1 for 1-based indexing
+      ;(book as Record<string, unknown>)._sheetRowIndex = i + 2 // +2 because: +1 for header row, +1 for 1-based indexing
 
       books.push(book)
     }
@@ -379,7 +398,7 @@ export async function validateCoverImage(
   // If we have a URL, try to improve it
   if (url) {
     // Clean up Google Books image URLs for better quality
-    let cleanUrl = url.replace("&edge=curl", "")
+    const cleanUrl = url.replace("&edge=curl", "")
     // Keep zoom=1 as most books don't have zoom=2 available
 
     // Try to verify the image exists
@@ -475,7 +494,7 @@ export async function searchBooks(
   type: "title" | "author" | "isbn" | "general" = "general",
   source: "google" | "openlibrary" | "all" = "google"
 ) {
-  const results: any[] = []
+  const results: Book[] = []
 
   try {
     // Based on source parameter, decide which APIs to call
@@ -509,7 +528,8 @@ export async function searchBooks(
         for (const item of googleBooks.items) {
           const volumeInfo = item.volumeInfo
           const isbn = volumeInfo.industryIdentifiers?.find(
-            (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
+            (id: { type: string }) =>
+              id.type === "ISBN_13" || id.type === "ISBN_10"
           )?.identifier
 
           // Get the best available cover image and upload it to UploadThing
@@ -735,7 +755,7 @@ export async function fetchBookPrice(
   return await getDutchBookPrice(isbn, title)
 }
 
-export async function addBook(sheetId: string, values: any[]) {
+export async function addBook(sheetId: string, values: string[]) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
@@ -748,7 +768,7 @@ export async function addBook(sheetId: string, values: any[]) {
 }
 
 // Enhanced addBook function that accepts a book object and generates unique ID
-export async function addBookWithId(sheetId: string, book: any) {
+export async function addBookWithId(sheetId: string, book: Book) {
   const sheets = await getSheets()
 
   // First, get the current headers to understand the sheet structure
@@ -760,7 +780,13 @@ export async function addBookWithId(sheetId: string, book: any) {
   const headers = headerRes.data.values?.[0] || []
 
   // Generate unique ID if not provided
-  const id = book.id || generateBookId(book.isbn, book.title, book.author)
+  const id =
+    book.id ||
+    generateBookId(
+      book.isbn || undefined,
+      book.title || undefined,
+      book.author || undefined
+    )
 
   // Ensure the book has the generated ID
   const bookWithId = { ...book, id }
@@ -878,11 +904,11 @@ export async function addIdsToExistingBooks(sheetId: string) {
   }
 
   // Check each row and add ID if missing
-  const updates: any[] = []
+  const updates: { range: string; values: string[][] }[] = []
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
-    const book: any = {}
+    const book: Record<string, string> = {}
 
     headers.forEach((h, j) => {
       book[h] = row[j] || ""
@@ -989,7 +1015,7 @@ export async function deleteBookById(sheetId: string, bookId: string) {
 export async function updateBook(
   sheetId: string,
   rowIndex: number,
-  values: any[]
+  values: string[]
 ) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.update({

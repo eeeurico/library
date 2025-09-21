@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server"
 import { getBooks } from "@/lib/sheets"
 
+type Book = {
+  id?: string
+  isbn?: string | null
+  title?: string | null
+  author?: string | null
+  type?: string | null
+  coverUrl?: string | null
+  notes?: string | null
+  price?: string | null
+  publisher?: string | null
+  year?: string | null
+  url?: string | null
+  edition?: string | null
+  language?: string | null
+  sellingprice?: string | null
+  forsale?: boolean | string | null
+}
+
 export async function GET() {
   try {
     const books = await getBooks(process.env.SHEET_ID!)
@@ -9,12 +27,12 @@ export async function GET() {
     // logic here to filter out books with forsale = false for unauthenticated users
 
     // Convert string "TRUE"/"FALSE" to boolean for forsale field
-    const processedBooks = books.map((book) => ({
+    const processedBooks = books.map((book: Book) => ({
       ...book,
       forsale:
-        (book as any).forsale === "TRUE" ||
-        (book as any).forsale === true ||
-        (book as any).forsale === undefined, // Default to true if not set
+        book.forsale === "TRUE" ||
+        book.forsale === true ||
+        book.forsale === undefined, // Default to true if not set
     }))
 
     return NextResponse.json(processedBooks)

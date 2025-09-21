@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAllCoverImageUrls, getBooks, addBookWithId } from "@/lib/sheets"
 import { uploadBestAvailableImage } from "@/lib/uploadUtils"
 
+type Book = {
+  id?: string
+  isbn?: string | null
+  title?: string | null
+  author?: string | null
+  type?: string | null
+  coverUrl?: string | null
+  notes?: string | null
+  price?: string | null
+  publisher?: string | null
+  year?: string | null
+  url?: string | null
+  edition?: string | null
+  language?: string | null
+  sellingprice?: string | null
+  forsale?: boolean | string | null
+}
+
 // Helper function to clean ISBN from Goodreads format
 function cleanISBN(isbn: string): string {
   if (!isbn) return ""
@@ -10,8 +28,9 @@ function cleanISBN(isbn: string): string {
 }
 
 // Helper function to parse CSV row into book object
-function parseCSVBook(row: string[]): any {
+function parseCSVBook(row: string[]): Book | null {
   // Based on Goodreads CSV structure
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [
     bookId,
     title,
@@ -62,9 +81,9 @@ function parseCSVBook(row: string[]): any {
 }
 
 // Helper function to parse CSV content
-function parseCSV(csvContent: string): any[] {
+function parseCSV(csvContent: string): Book[] {
   const lines = csvContent.split("\n")
-  const books: any[] = []
+  const books: Book[] = []
 
   // Skip header row
   for (let i = 1; i < lines.length; i++) {
@@ -147,8 +166,8 @@ export async function POST(request: NextRequest) {
     const existingBooks = await getBooks(process.env.SHEET_ID!)
     const existingISBNs = new Set(
       existingBooks
-        .filter((book: any) => book.isbn)
-        .map((book: any) => book.isbn)
+        .filter((book: Book) => book.isbn)
+        .map((book: Book) => book.isbn)
     )
 
     // Create a streaming response
@@ -161,7 +180,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(data))
         }
 
-        const sendResult = (result: any) => {
+        const sendResult = (result: unknown) => {
           const data = JSON.stringify({ type: "result", result }) + "\n"
           controller.enqueue(encoder.encode(data))
         }
@@ -192,11 +211,14 @@ export async function POST(request: NextRequest) {
               }
 
               // Check for duplicates by title + author (case insensitive)
-              const titleAuthorKey = `${book.title.toLowerCase()}|${book.author.toLowerCase()}`
+              const titleAuthorKey = `${(book.title || "").toLowerCase()}|${(
+                book.author || ""
+              ).toLowerCase()}`
               const isDuplicateByTitle = existingBooks.some(
-                (existing: any) =>
-                  `${existing.title.toLowerCase()}|${existing.author.toLowerCase()}` ===
-                  titleAuthorKey
+                (existing: Book) =>
+                  `${(existing.title || "").toLowerCase()}|${(
+                    existing.author || ""
+                  ).toLowerCase()}` === titleAuthorKey
               )
 
               if (isDuplicateByTitle) {
@@ -210,9 +232,9 @@ export async function POST(request: NextRequest) {
                 try {
                   // Get all possible cover image URLs
                   const imageUrls = getAllCoverImageUrls(
-                    book.isbn,
-                    book.title,
-                    book.author
+                    book.isbn || undefined,
+                    book.title || undefined,
+                    book.author || undefined
                   )
 
                   if (imageUrls.length > 0) {
@@ -220,9 +242,9 @@ export async function POST(request: NextRequest) {
                     const uploadedCoverUrl = await uploadBestAvailableImage(
                       imageUrls,
                       {
-                        isbn: book.isbn,
-                        title: book.title,
-                        author: book.author,
+                        isbn: book.isbn || undefined,
+                        title: book.title || undefined,
+                        author: book.author || undefined,
                       }
                     )
 
