@@ -1,4 +1,5 @@
 import { google } from "googleapis"
+import { uploadBestAvailableImage } from "./uploadUtils"
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -10,11 +11,44 @@ const auth = new google.auth.GoogleAuth({
   scopes: SCOPES,
 })
 
+// Function to create a slug from a string
+function createSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "") // Remove special characters
+    .replace(/\s+/g, "-") // Replace spaces with hyphens
+    .replace(/-+/g, "-") // Replace multiple hyphens with single
+    .trim()
+}
+
+// Function to generate a unique ID for books
+export function generateBookId(
+  isbn?: string,
+  title?: string,
+  author?: string
+): string {
+  const timestamp = Date.now().toString(36) // Base36 timestamp for shorter string
+  const random = Math.random().toString(36).substring(2, 8) // 6 character random string
+
+  let uniquePart = ""
+  if (isbn) {
+    uniquePart = isbn.replace(/[^\d]/g, "") // Clean ISBN numbers only
+  } else if (title && author) {
+    const titleSlug = createSlug(title).substring(0, 10) // First 10 chars of title slug
+    const authorSlug = createSlug(author).substring(0, 10) // First 10 chars of author slug
+    uniquePart = `${titleSlug}-${authorSlug}`
+  }
+
+  return uniquePart
+    ? `${uniquePart}-${timestamp}-${random}`
+    : `book-${timestamp}-${random}`
+}
+
 export async function getBooks(sheetId: string) {
   const sheets = await getSheets()
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:O", // Covers all columns including notforsale
+    range: "Sheet1!A:P", // Extended range to include ID column and potential future columns
   })
 
   const rows = res.data.values || []
@@ -22,13 +56,36 @@ export async function getBooks(sheetId: string) {
 
   // First row is header, skip it
   const headers = rows[0]
-  return rows.slice(1).map((row, i) => {
+  const books: any[] = []
+
+  rows.slice(1).forEach((row, i) => {
     let book: Record<string, any> = {}
     headers.forEach((h, j) => {
       book[h] = row[j] || "" // assign each column
     })
-    return { rowIndex: i + 1, ...book } // rowIndex is useful for deletion
+
+    // Only include non-empty rows (must have title AND author)
+    if (
+      book.title &&
+      book.title.trim() !== "" &&
+      book.author &&
+      book.author.trim() !== ""
+    ) {
+      // Generate ID if missing (for legacy books without ID)
+      if (!book.id || book.id.trim() === "") {
+        book.id = generateBookId(book.isbn, book.title, book.author)
+        // Optionally update the sheet with the generated ID
+        // This could be done in a background process
+      }
+
+      // Store sheet position for legacy operations that might still need it
+      book._sheetRowIndex = i + 2 // +2 because: +1 for header row, +1 for 1-based indexing
+
+      books.push(book)
+    }
   })
+
+  return books
 }
 
 // Function to check if an image URL returns a valid image
@@ -98,6 +155,54 @@ export async function getBestCoverImage(
   return null
 }
 
+// Function to get all possible cover image URLs for upload purposes
+// Returns array of URLs in priority order for the upload utility to try
+export function getAllCoverImageUrls(
+  isbn?: string,
+  title?: string,
+  author?: string,
+  googleCoverUrl?: string
+): string[] {
+  const imageSources = [
+    // Google Books (if available)
+    googleCoverUrl,
+    // Open Library covers (multiple sizes)
+    ...(isbn
+      ? [
+          `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+          `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+        ]
+      : []),
+    // Amazon covers (if ISBN-10 available)
+    ...(isbn && isbn.length === 13
+      ? [
+          `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(
+            isbn
+          )}.01.L.jpg`,
+          `https://images-na.ssl-images-amazon.com/images/P/${convertToIsbn10(
+            isbn
+          )}.01.M.jpg`,
+        ]
+      : []),
+    // WorldCat covers
+    ...(isbn
+      ? [
+          `https://www.worldcat.org/title/-/oclc-/covers/cover?isbn=${isbn}&size=L`,
+        ]
+      : []),
+    // BookCover API
+    ...(title && author
+      ? [
+          `https://bookcover.longitood.com/bookcover?book_title=${encodeURIComponent(
+            title
+          )}&author_name=${encodeURIComponent(author)}&size=large`,
+        ]
+      : []),
+  ].filter(Boolean) as string[]
+
+  return imageSources
+}
+
 // Convert ISBN-13 to ISBN-10 for Amazon covers
 function convertToIsbn10(isbn13: string): string | null {
   if (isbn13.length !== 13 || !isbn13.startsWith("978")) {
@@ -125,15 +230,27 @@ export async function enrichBook(isbn: string) {
   if (gb.totalItems > 0) {
     const item = gb.items[0].volumeInfo
     const thumbnailUrl = item.imageLinks?.thumbnail
-    const highResUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=2` : undefined
+    const highResUrl = thumbnailUrl ? `${thumbnailUrl}&zoom=1` : undefined
 
-    // Try to get a better cover image if Google's is not available or low quality
-    const coverUrl = await getBestCoverImage(
+    // Get all possible cover image URLs for this book
+    const allCoverUrls = getAllCoverImageUrls(
       isbn,
       item.title,
       item.authors?.[0],
       highResUrl
     )
+
+    // Upload the best available image to UploadThing
+    const uploadedCoverUrl = await uploadBestAvailableImage(allCoverUrls, {
+      isbn,
+      title: item.title,
+      author: item.authors?.[0],
+    })
+
+    // Fallback to getBestCoverImage if upload fails
+    const coverUrl =
+      uploadedCoverUrl ||
+      (await getBestCoverImage(isbn, item.title, item.authors?.[0], highResUrl))
 
     return {
       title: item.title,
@@ -262,7 +379,8 @@ export async function validateCoverImage(
   // If we have a URL, try to improve it
   if (url) {
     // Clean up Google Books image URLs for better quality
-    let cleanUrl = url.replace("&edge=curl", "").replace("zoom=1", "zoom=2")
+    let cleanUrl = url.replace("&edge=curl", "")
+    // Keep zoom=1 as most books don't have zoom=2 available
 
     // Try to verify the image exists
     try {
@@ -394,17 +512,35 @@ export async function searchBooks(
             (id: any) => id.type === "ISBN_13" || id.type === "ISBN_10"
           )?.identifier
 
-          // Get the best available cover image
+          // Get the best available cover image and upload it to UploadThing
           const thumbnailUrl = volumeInfo.imageLinks?.thumbnail
           const googleCoverUrl = thumbnailUrl
-            ? `${thumbnailUrl}&zoom=2`
+            ? `${thumbnailUrl}&zoom=1`
             : undefined
-          const coverUrl = await getBestCoverImage(
+
+          // Get all possible cover image URLs for this book
+          const allCoverUrls = getAllCoverImageUrls(
             isbn,
             volumeInfo.title,
             volumeInfo.authors?.[0],
             googleCoverUrl
           )
+
+          // Upload the best available image to UploadThing
+          const uploadedCoverUrl = await uploadBestAvailableImage(
+            allCoverUrls,
+            { isbn, title: volumeInfo.title, author: volumeInfo.authors?.[0] }
+          )
+
+          // Fallback to getBestCoverImage if upload fails
+          const coverUrl =
+            uploadedCoverUrl ||
+            (await getBestCoverImage(
+              isbn,
+              volumeInfo.title,
+              volumeInfo.authors?.[0],
+              googleCoverUrl
+            ))
 
           // Extract language from metadata
           const language =
@@ -463,12 +599,34 @@ export async function searchBooks(
         for (const doc of openLib.docs) {
           const isbn = doc.isbn?.[0]
 
-          // Simple cover image handling - no validation for search
-          let coverUrl
+          // Get cover image URLs and upload to UploadThing
+          const coverImageUrls: string[] = []
           if (isbn) {
-            coverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
+            coverImageUrls.push(
+              `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+            )
+            coverImageUrls.push(
+              `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`
+            )
           } else if (doc.cover_i) {
-            coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+            coverImageUrls.push(
+              `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+            )
+            coverImageUrls.push(
+              `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+            )
+          }
+
+          // Upload the best available image to UploadThing
+          const uploadedCoverUrl = await uploadBestAvailableImage(
+            coverImageUrls,
+            { isbn, title: doc.title, author: doc.author_name?.[0] }
+          )
+
+          // Fallback to original URL if upload fails
+          let coverUrl = uploadedCoverUrl
+          if (!coverUrl && coverImageUrls.length > 0) {
+            coverUrl = coverImageUrls[0] // Use the first URL as fallback
           }
 
           // Extract language from metadata (Open Library uses language codes)
@@ -581,15 +739,179 @@ export async function addBook(sheetId: string, values: any[]) {
   const sheets = await getSheets()
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "Sheet1!A:O", // adjust to your column range
+    range: "Sheet1!A:P", // Extended to P to include more columns if needed
     valueInputOption: "RAW",
     requestBody: {
-      values: [values], // e.g. ["4", "9780140449266", "The Odyssey", "Homer", "book"]
+      values: [values], // e.g. ["unique-id", "9780140449266", "The Odyssey", "Homer", "book"]
     },
   })
 }
 
-export async function deleteBook(sheetId: string, rowIndex: number) {
+// Enhanced addBook function that accepts a book object and generates unique ID
+export async function addBookWithId(sheetId: string, book: any) {
+  const sheets = await getSheets()
+
+  // First, get the current headers to understand the sheet structure
+  const headerRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: "Sheet1!1:1", // Get just the header row
+  })
+
+  const headers = headerRes.data.values?.[0] || []
+
+  // Generate unique ID if not provided
+  const id = book.id || generateBookId(book.isbn, book.title, book.author)
+
+  // Ensure the book has the generated ID
+  const bookWithId = { ...book, id }
+
+  // Check if 'id' column exists
+  const idColumnIndex = headers.findIndex((h) => h.toLowerCase() === "id")
+
+  if (idColumnIndex === -1) {
+    // No ID column exists - we need to add it as the first column
+    // First, add the ID header if this is the first book
+    if (headers.length === 0) {
+      // Sheet is empty, add headers
+      const newHeaders = [
+        "id",
+        "isbn",
+        "title",
+        "author",
+        "type",
+        "publisher",
+        "year",
+        "edition",
+        "coverUrl",
+        "notes",
+        "price",
+        "url",
+        "language",
+        "sellingprice",
+        "forsale",
+      ]
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: "Sheet1!A1:O1",
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [newHeaders],
+        },
+      })
+    } else {
+      // Insert ID column as the first column
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: {
+          requests: [
+            {
+              insertDimension: {
+                range: {
+                  sheetId: 0,
+                  dimension: "COLUMNS",
+                  startIndex: 0,
+                  endIndex: 1,
+                },
+              },
+            },
+          ],
+        },
+      })
+
+      // Add 'id' header to the new first column
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: "Sheet1!A1",
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [["id"]],
+        },
+      })
+    }
+  }
+
+  // Now add the book data based on the current structure
+  // If we just added the ID column, use the new structure
+  const values = [
+    id, // ID (now guaranteed to be first column)
+    bookWithId.isbn || "",
+    bookWithId.title || "",
+    bookWithId.author || "",
+    bookWithId.type || "",
+    bookWithId.publisher || "",
+    bookWithId.year || "",
+    bookWithId.edition || "",
+    bookWithId.coverUrl || "",
+    bookWithId.notes || "",
+    bookWithId.price || "",
+    bookWithId.url || "",
+    bookWithId.language || "",
+    bookWithId.sellingprice || "",
+    bookWithId.forsale !== false ? "TRUE" : "FALSE", // Convert boolean to Google Sheets string
+  ]
+
+  await addBook(sheetId, values)
+  return bookWithId
+}
+
+// Utility function to add IDs to existing books in the sheet
+export async function addIdsToExistingBooks(sheetId: string) {
+  const sheets = await getSheets()
+
+  // Get all current data
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: "Sheet1!A:P",
+  })
+
+  const rows = res.data.values || []
+  if (rows.length === 0) return
+
+  const headers = rows[0]
+  const idColumnIndex = headers.findIndex((h) => h.toLowerCase() === "id")
+
+  if (idColumnIndex === -1) {
+    console.log(
+      "No ID column found. Use addBookWithId to add new books and it will create the ID column."
+    )
+    return
+  }
+
+  // Check each row and add ID if missing
+  const updates: any[] = []
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]
+    const book: any = {}
+
+    headers.forEach((h, j) => {
+      book[h] = row[j] || ""
+    })
+
+    // If this row has title and author but no ID, generate one
+    if (book.title && book.author && (!book.id || book.id.trim() === "")) {
+      const newId = generateBookId(book.isbn, book.title, book.author)
+      updates.push({
+        range: `Sheet1!${String.fromCharCode(65 + idColumnIndex)}${i + 1}`, // Convert to A1 notation
+        values: [[newId]],
+      })
+    }
+  }
+
+  // Batch update all the missing IDs
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        valueInputOption: "RAW",
+        data: updates,
+      },
+    })
+    console.log(`Updated ${updates.length} books with new IDs`)
+  }
+}
+
+export async function deleteBook(sheetId: string, sheetRowIndex: number) {
   const sheets = await getSheets()
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: sheetId,
@@ -600,8 +922,62 @@ export async function deleteBook(sheetId: string, rowIndex: number) {
             range: {
               sheetId: 0, // usually 0 = first sheet
               dimension: "ROWS",
-              startIndex: rowIndex, // 0-based
-              endIndex: rowIndex + 1,
+              startIndex: sheetRowIndex - 1, // Convert to 0-based index
+              endIndex: sheetRowIndex,
+            },
+          },
+        },
+      ],
+    },
+  })
+}
+
+// New function to delete book by unique ID
+export async function deleteBookById(sheetId: string, bookId: string) {
+  const sheets = await getSheets()
+
+  // First, get all rows to find the row with matching ID
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: "Sheet1!A:P",
+  })
+
+  const rows = res.data.values || []
+  if (rows.length === 0) throw new Error("Sheet is empty")
+
+  const headers = rows[0]
+  const idColumnIndex = headers.findIndex((h) => h.toLowerCase() === "id")
+
+  if (idColumnIndex === -1) {
+    throw new Error("ID column not found in sheet")
+  }
+
+  // Find the row with matching ID
+  let targetRowIndex = -1
+  for (let i = 1; i < rows.length; i++) {
+    // Start from 1 to skip header
+    if (rows[i][idColumnIndex] === bookId) {
+      targetRowIndex = i + 1 // Convert to 1-based index
+      break
+    }
+  }
+
+  if (targetRowIndex === -1) {
+    throw new Error(`Book with ID ${bookId} not found`)
+  }
+
+  // Delete the row
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: 0,
+              dimension: "ROWS",
+              startIndex: targetRowIndex - 1, // Convert to 0-based index
+              endIndex: targetRowIndex,
             },
           },
         },

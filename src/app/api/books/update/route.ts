@@ -41,7 +41,7 @@ export async function PUT(request: NextRequest) {
       bookData.url || "",
       bookData.language || "",
       bookData.sellingprice || "",
-      bookData.notforsale ? "TRUE" : "FALSE",
+      bookData.forsale !== false ? "TRUE" : "FALSE", // Default to TRUE (for sale)
     ]
 
     console.log("Updating sheet with values:", values)

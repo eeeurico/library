@@ -19,7 +19,7 @@ type NewBook = {
   edition?: string
   language?: string
   sellingprice?: string
-  notforsale?: boolean
+  forsale?: boolean | string // Can be boolean or "TRUE"/"FALSE" string from Google Sheets
 }
 
 interface AddBookModalProps {
@@ -89,7 +89,7 @@ export default function AddBookModal({
   const [formData, setFormData] = useState<NewBook>({
     title: "",
     author: "",
-    type: "book",
+    type: "paperback",
     isbn: "",
     publisher: "",
     year: "",
@@ -100,7 +100,7 @@ export default function AddBookModal({
     url: "",
     language: "",
     sellingprice: "",
-    notforsale: false,
+    forsale: true, // Default to for sale
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -139,7 +139,7 @@ export default function AddBookModal({
       setFormData({
         title: "",
         author: "",
-        type: "book",
+        type: "paperback",
         isbn: "",
         publisher: "",
         year: "",
@@ -150,7 +150,7 @@ export default function AddBookModal({
         url: "",
         language: "",
         sellingprice: "",
-        notforsale: false,
+        forsale: true, // Default to for sale
       })
       onClose()
     } catch (error) {
@@ -166,7 +166,7 @@ export default function AddBookModal({
     setFormData({
       title: "",
       author: "",
-      type: "book",
+      type: "paperback",
       isbn: "",
       publisher: "",
       year: "",
@@ -177,7 +177,7 @@ export default function AddBookModal({
       url: "",
       language: "",
       sellingprice: "",
-      notforsale: false,
+      forsale: true, // Default to for sale
     })
     onClose()
   }
@@ -289,15 +289,19 @@ export default function AddBookModal({
                 Type
               </label>
               <select
-                value={formData.type}
+                value={formData.type || ""}
                 onChange={(e) => handleInputChange("type", e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
               >
-                <option value="book">Book</option>
+                <option value="">Select type</option>
+                <option value="paperback">Paperback</option>
+                <option value="hardcover">Hardcover</option>
                 <option value="zine">Zine</option>
-                <option value="artist edition">Artist Edition</option>
                 <option value="magazine">Magazine</option>
                 <option value="catalog">Catalog</option>
+                <option value="artist edition">Artist Edition</option>
+                <option value="ebook">E-book</option>
+                <option value="audiobook">Audiobook</option>
                 <option value="other">Other</option>
               </select>
             </div>
@@ -436,17 +440,21 @@ export default function AddBookModal({
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={formData.notforsale || false}
+                checked={
+                  formData.forsale === true ||
+                  formData.forsale === "TRUE" ||
+                  formData.forsale === undefined // Default to true (for sale)
+                }
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    notforsale: e.target.checked,
+                    forsale: e.target.checked,
                   }))
                 }
                 className="w-4 h-4 text-blue-600 bg-background border-border rounded focus:ring-blue-500 focus:ring-2"
               />
               <span className="text-sm font-medium text-foreground">
-                Not for sale (hide from public library)
+                For sale (show in public library)
               </span>
             </label>
           </div>

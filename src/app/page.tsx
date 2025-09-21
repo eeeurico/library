@@ -9,7 +9,7 @@ import ImportBooksModal from "@/components/ImportBooksModal"
 import LoginModal from "@/components/LoginModal"
 
 type Book = {
-  id?: string
+  id: string
   isbn?: string
   title: string
   author: string
@@ -22,8 +22,7 @@ type Book = {
   url?: string
   language?: string
   sellingprice?: string
-  notforsale?: boolean
-  rowIndex: number
+  forsale?: boolean | string // Can be boolean or "TRUE"/"FALSE" string from Google Sheets
 }
 
 type ViewMode = "grid" | "table"
@@ -34,7 +33,7 @@ export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [loading, setLoading] = useState(true)
-  const [fetchingPrices, setFetchingPrices] = useState<Set<number>>(new Set())
+  const [fetchingPrices, setFetchingPrices] = useState<Set<string>>(new Set())
   const [isValidating, setIsValidating] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
@@ -46,6 +45,19 @@ export default function BooksPage() {
     "default"
   )
   const [quickSearch, setQuickSearch] = useState("")
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Mobile detection
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkIsMobile()
+    window.addEventListener("resize", checkIsMobile)
+
+    return () => window.removeEventListener("resize", checkIsMobile)
+  }, [])
 
   // Initialize view mode from localStorage
   useEffect(() => {
@@ -56,12 +68,17 @@ export default function BooksPage() {
       savedViewMode &&
       (savedViewMode === "grid" || savedViewMode === "table")
     ) {
-      setViewMode(savedViewMode)
+      // Force grid view on mobile regardless of saved preference
+      setViewMode(isMobile ? "grid" : savedViewMode)
     }
-  }, [])
+  }, [isMobile])
 
   // Save view mode to localStorage when it changes
   const handleViewModeChange = (mode: ViewMode) => {
+    // Don't allow table view on mobile
+    if (isMobile && mode === "table") {
+      return
+    }
     setViewMode(mode)
     localStorage.setItem("bookLibrary_viewMode", mode)
   }
@@ -185,11 +202,11 @@ export default function BooksPage() {
       const response = await fetch("/api/books/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rowIndex: book.rowIndex }),
+        body: JSON.stringify({ id: book.id }),
       })
 
       if (response.ok) {
-        const updatedBooks = books.filter((b) => b.rowIndex !== book.rowIndex)
+        const updatedBooks = books.filter((b) => b.id !== book.id)
         setBooks(updatedBooks)
 
         // Update cache immediately
@@ -198,6 +215,7 @@ export default function BooksPage() {
           "bookLibrary_books_timestamp",
           Date.now().toString()
         )
+        showToast("Book deleted successfully", "success")
       } else {
         showToast("Failed to delete book", "error")
       }
@@ -222,7 +240,7 @@ export default function BooksPage() {
 
       if (response.ok) {
         const updatedBooks = books.map((book) =>
-          book.rowIndex === updatedBook.rowIndex ? updatedBook : book
+          book.id === updatedBook.id ? updatedBook : book
         )
         setBooks(updatedBooks)
 
@@ -309,7 +327,7 @@ export default function BooksPage() {
   const handleFetchPrice = async (book: Book) => {
     if (!book.isbn || !book.title) return
 
-    setFetchingPrices((prev) => new Set([...prev, book.rowIndex]))
+    setFetchingPrices((prev) => new Set([...prev, book.id]))
 
     try {
       const response = await fetch(
@@ -323,7 +341,7 @@ export default function BooksPage() {
         // Update the book in the local state
         setBooks((prevBooks) =>
           prevBooks.map((b) =>
-            b.rowIndex === book.rowIndex ? { ...b, price: data.price } : b
+            b.id === book.id ? { ...b, price: data.price } : b
           )
         )
       }
@@ -332,7 +350,7 @@ export default function BooksPage() {
     } finally {
       setFetchingPrices((prev) => {
         const newSet = new Set(prev)
-        newSet.delete(book.rowIndex)
+        newSet.delete(book.id)
         return newSet
       })
     }
@@ -348,7 +366,22 @@ export default function BooksPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <svg
+          aria-hidden="true"
+          className="w-12 h-12 text-white/20 animate-spin  fill-white"
+          viewBox="0 0 100 101"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+            fill="currentColor"
+          />
+          <path
+            d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+            fill="currentFill"
+          />
+        </svg>
       </div>
     )
   }
@@ -434,7 +467,7 @@ export default function BooksPage() {
             </button>
             <button
               onClick={() => handleViewModeChange("table")}
-              className={`px-4 py-2 text-sm font-normal transition-all cursor-pointer ${
+              className={`px-4 py-2 text-sm font-normal transition-all cursor-pointer hidden md:block ${
                 viewMode === "table"
                   ? "text-foreground border-b border-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -447,7 +480,7 @@ export default function BooksPage() {
       </div>
 
       {/* Search and Sort Controls */}
-      <div className="w-full max-w-7xl mx-auto px-6 mb-6">
+      <div className="w-full px-6 mb-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           {/* Quick Search */}
           <div className="flex-1 max-w-md">
@@ -517,10 +550,15 @@ export default function BooksPage() {
 
       {/* Filter, search, and sort books */}
       {(() => {
-        // First filter by authentication and notforsale
+        // First filter by authentication and forsale status
         let filteredBooks = isAuthenticated
           ? books
-          : books.filter((book) => !book.notforsale)
+          : books.filter(
+              (book) =>
+                book.forsale === true ||
+                book.forsale === "TRUE" ||
+                book.forsale === undefined // Show books that are for sale (default true)
+            )
 
         // Apply quick search filter
         if (quickSearch.trim()) {
@@ -549,7 +587,7 @@ export default function BooksPage() {
           case "default":
           default:
             // Keep original sheet order (by rowIndex)
-            filteredBooks.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0))
+            filteredBooks // Keep original order when no specific sort is applied
             break
         }
 
@@ -557,7 +595,7 @@ export default function BooksPage() {
           <>
             {/* Results count and clear search */}
             {(quickSearch.trim() || filteredBooks.length !== books.length) && (
-              <div className="w-full max-w-7xl mx-auto px-6 mb-4">
+              <div className="w-full px-6 mb-4">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span>
                     Showing {filteredBooks.length} of {books.length} books
@@ -604,7 +642,7 @@ export default function BooksPage() {
                   </div>
                 )}
               </div>
-            ) : viewMode === "grid" ? (
+            ) : viewMode === "grid" || isMobile ? (
               <GridView
                 books={filteredBooks}
                 onDelete={handleDelete}
@@ -731,7 +769,7 @@ function GridView({
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 px-6">
       {books.map((book) => (
-        <div key={book.rowIndex} className="group">
+        <div key={book.id} className="group">
           <div className="relative aspect-[3/4] mb-3">
             {book.coverUrl ? (
               <img
@@ -794,8 +832,39 @@ function GridView({
             <p className="text-xs text-muted-foreground line-clamp-1">
               {book.author || "Unknown Author"}
             </p>
+            {book.type && (
+              <p className="text-xs text-muted-foreground mt-1 capitalize">
+                {book.type}
+              </p>
+            )}
             {book.year && (
               <p className="text-xs text-muted-foreground mt-1">{book.year}</p>
+            )}
+            {/* Price display logic */}
+            {(book.price || book.sellingprice) && (
+              <div className="text-xs mt-1 flex flex-col gap-1">
+                {book.sellingprice &&
+                book.price &&
+                book.sellingprice !== book.price ? (
+                  // Show both prices with strikethrough on original
+                  <>
+                    <p className="text-muted-foreground line-through">
+                      ${book.price}
+                    </p>
+                    <p className="font-medium text-green-600">
+                      ${book.sellingprice}
+                    </p>
+                  </>
+                ) : book.sellingprice ? (
+                  // Show only selling price
+                  <p className="font-medium text-green-600">
+                    ${book.sellingprice}
+                  </p>
+                ) : (
+                  // Show only original price
+                  <p className="text-muted-foreground">${book.price}</p>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -816,7 +885,7 @@ function TableView({
   onDelete: (book: Book) => void
   onEdit: (book: Book) => void
   onFetchPrice: (book: Book) => void
-  fetchingPrices: Set<number>
+  fetchingPrices: Set<string>
   isAuthenticated: boolean
 }) {
   return (
@@ -833,6 +902,9 @@ function TableView({
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[150px]">
               Author
             </th>
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
+              Type
+            </th>
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
               Publisher
             </th>
@@ -847,14 +919,14 @@ function TableView({
                 Price
               </th>
             )}
-            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
-              Language
-            </th>
             {isAuthenticated && (
               <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Selling Price
               </th>
             )}
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
+              Language
+            </th>
             {isAuthenticated && (
               <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Status
@@ -873,7 +945,7 @@ function TableView({
         <tbody>
           {books.map((book) => (
             <tr
-              key={book.rowIndex}
+              key={book.id}
               className="border-b border-border hover:bg-muted/30 transition-colors"
             >
               <td className="py-4 px-2">
@@ -905,6 +977,11 @@ function TableView({
                 {book.author || "Unknown"}
               </td>
               <td className="py-4 px-2 text-sm text-muted-foreground">
+                <span className="px-2 py-1 text-xs rounded-sm bg-muted text-muted-foreground capitalize">
+                  {book.type || "paperback"}
+                </span>
+              </td>
+              <td className="py-4 px-2 text-sm text-muted-foreground">
                 {book.publisher || "—"}
               </td>
               <td className="py-4 px-2 text-sm text-muted-foreground">
@@ -916,14 +993,16 @@ function TableView({
               {isAuthenticated && (
                 <td className="py-4 px-2 text-sm">
                   {book.price ? (
-                    <span className="text-foreground">{book.price}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-foreground">{book.price}</span>
+                    </div>
                   ) : book.isbn ? (
                     <button
                       onClick={() => onFetchPrice(book)}
-                      disabled={fetchingPrices.has(book.rowIndex)}
+                      disabled={fetchingPrices.has(book.id)}
                       className="text-xs px-2 py-1 bg-[rgba(96,96,96,0.5)] text-white hover:bg-[#595959] rounded-sm disabled:opacity-50 cursor-pointer"
                     >
-                      {fetchingPrices.has(book.rowIndex) ? "..." : "Get Price"}
+                      {fetchingPrices.has(book.id) ? "..." : "Get Price"}
                     </button>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -931,23 +1010,33 @@ function TableView({
                 </td>
               )}
               <td className="py-4 px-2 text-sm text-muted-foreground">
+                {book.sellingprice ? (
+                  <span className="font-medium text-green-600">
+                    {book.sellingprice}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="py-4 px-2 text-sm text-muted-foreground">
                 {book.language || "—"}
               </td>
-              {isAuthenticated && (
-                <td className="py-4 px-2 text-sm text-muted-foreground">
-                  {book.sellingprice || "—"}
-                </td>
-              )}
               {isAuthenticated && (
                 <td className="py-4 px-2 text-sm">
                   <span
                     className={`px-2 py-1 text-xs rounded-sm ${
-                      book.notforsale
+                      book.forsale === true ||
+                      book.forsale === "TRUE" ||
+                      book.forsale === undefined
                         ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
                         : "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
                     }`}
                   >
-                    {book.notforsale ? "Not for Sale" : "For Sale"}
+                    {book.forsale === true ||
+                    book.forsale === "TRUE" ||
+                    book.forsale === undefined
+                      ? "For Sale"
+                      : "Not for Sale"}
                   </span>
                 </td>
               )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getBestCoverImage, getBooks, addBook } from "@/lib/sheets"
+import { getAllCoverImageUrls, getBooks, addBookWithId } from "@/lib/sheets"
+import { uploadBestAvailableImage } from "@/lib/uploadUtils"
 
 // Helper function to clean ISBN from Goodreads format
 function cleanISBN(isbn: string): string {
@@ -53,7 +54,7 @@ function parseCSVBook(row: string[]): any {
     publisher: publisher?.trim() || "",
     year: yearPublished?.trim() || originalPublicationYear?.trim() || "",
     notes: privateNotes?.trim() || "",
-    type: "book",
+    type: "paperback",
     language: "", // Will be enriched
     coverUrl: "", // Will be enriched
     url: "", // Will be enriched
@@ -204,41 +205,58 @@ export async function POST(request: NextRequest) {
                 continue
               }
 
-              // Enrich book data
-              if (book.isbn) {
+              // Enrich book data - upload cover image to UploadThing
+              if (book.isbn || (book.title && book.author)) {
                 try {
-                  const coverUrl = await getBestCoverImage(
+                  // Get all possible cover image URLs
+                  const imageUrls = getAllCoverImageUrls(
                     book.isbn,
                     book.title,
                     book.author
                   )
-                  if (coverUrl) {
-                    book.coverUrl = coverUrl
+
+                  if (imageUrls.length > 0) {
+                    // Upload the best available cover image to UploadThing
+                    const uploadedCoverUrl = await uploadBestAvailableImage(
+                      imageUrls,
+                      {
+                        isbn: book.isbn,
+                        title: book.title,
+                        author: book.author,
+                      }
+                    )
+
+                    if (uploadedCoverUrl) {
+                      book.coverUrl = uploadedCoverUrl
+                      console.log(
+                        `Successfully uploaded cover for "${book.title}" to UploadThing`
+                      )
+                    }
                   }
                 } catch (error) {
-                  console.warn(`Failed to get cover for ${book.title}:`, error)
+                  console.warn(
+                    `Failed to upload cover for ${book.title}:`,
+                    error
+                  )
                 }
               }
 
-              // Add the book
-              const values = [
-                "", // id - auto-generated
-                book.isbn || "",
-                book.title || "",
-                book.author || "",
-                book.type || "book",
-                book.publisher || "",
-                book.year || "",
-                "", // edition
-                book.coverUrl || "",
-                book.notes || "",
-                "", // price
-                book.url || "",
-                book.language || "",
-                "", // sellingprice
-                "FALSE", // notforsale
-              ]
-              await addBook(process.env.SHEET_ID!, values)
+              // Add the book using the new addBookWithId function
+              const bookData = {
+                isbn: book.isbn || "",
+                title: book.title || "",
+                author: book.author || "",
+                type: book.type || "paperback",
+                publisher: book.publisher || "",
+                year: book.year || "",
+                coverUrl: book.coverUrl || "",
+                notes: book.notes || "",
+                url: book.url || "",
+                language: book.language || "",
+                sellingprice: "",
+                forsale: true, // Default to for sale
+              }
+              await addBookWithId(process.env.SHEET_ID!, bookData)
               result.added++
 
               // Add to existing ISBNs to prevent duplicates within this import

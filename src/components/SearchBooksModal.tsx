@@ -99,7 +99,7 @@ export default function SearchBooksModal({
           coverUrl: book.coverUrl,
           price: "", // Empty price, will be fetched on-demand
           url: book.url || "",
-          type: "book",
+          type: "paperback",
         }),
       })
 

@@ -5,7 +5,7 @@ import { useToast } from "./ToastProvider"
 import type { OurFileRouter } from "@/app/api/uploadthing/core"
 
 type Book = {
-  id?: string
+  id: string
   isbn?: string
   title: string
   author: string
@@ -19,8 +19,7 @@ type Book = {
   edition?: string
   language?: string
   sellingprice?: string
-  notforsale?: boolean
-  rowIndex: number
+  forsale?: boolean | string // Can be boolean or "TRUE"/"FALSE" string from Google Sheets
 }
 
 interface EditBookModalProps {
@@ -272,6 +271,28 @@ export default function EditBookModal({
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
+                Type
+              </label>
+              <select
+                value={formData.type || ""}
+                onChange={(e) => handleInputChange("type", e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+              >
+                <option value="">Select type</option>
+                <option value="paperback">Paperback</option>
+                <option value="hardcover">Hardcover</option>
+                <option value="zine">Zine</option>
+                <option value="magazine">Magazine</option>
+                <option value="catalog">Catalog</option>
+                <option value="artist edition">Artist Edition</option>
+                <option value="ebook">E-book</option>
+                <option value="audiobook">Audiobook</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
                 ISBN
               </label>
               <input
@@ -400,17 +421,21 @@ export default function EditBookModal({
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={formData.notforsale || false}
+                checked={
+                  formData.forsale === true ||
+                  formData.forsale === "TRUE" ||
+                  formData.forsale === undefined // Default to true (for sale)
+                }
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    notforsale: e.target.checked,
+                    forsale: e.target.checked,
                   }))
                 }
                 className="w-4 h-4 text-blue-600 bg-background border-border rounded focus:ring-blue-500 focus:ring-2"
               />
               <span className="text-sm font-medium text-foreground">
-                Not for sale (hide from public library)
+                For sale (show in public library)
               </span>
             </label>
           </div>
