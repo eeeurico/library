@@ -1027,3 +1027,38 @@ export async function updateBook(
     },
   })
 }
+
+export async function updateBookById(sheetId: string, bookId: string, bookData: Book) {
+  const books = await getBooks(sheetId)
+  
+  // Find the book by ID
+  const bookIndex = books.findIndex((book: Book) => book.id === bookId)
+  if (bookIndex === -1) {
+    throw new Error(`Book with ID ${bookId} not found`)
+  }
+  
+  // Get the sheet row index (accounting for header row)
+  const sheetRowIndex = bookIndex + 1 // +1 for header row
+  
+  // Convert book data to array format matching sheet columns
+  const values = [
+    bookData.id || "",
+    bookData.isbn || "",
+    bookData.title || "",
+    bookData.author || "",
+    bookData.type || "",
+    bookData.publisher || "",
+    bookData.year || "",
+    bookData.edition || "",
+    bookData.coverUrl || "",
+    bookData.notes || "",
+    bookData.price || "",
+    bookData.url || "",
+    bookData.language || "",
+    bookData.sellingprice || "",
+    bookData.forsale !== false ? "TRUE" : "FALSE", // Convert boolean to string
+  ]
+  
+  // Update the row using the existing updateBook function
+  await updateBook(sheetId, sheetRowIndex, values)
+}

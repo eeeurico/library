@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { updateBook } from "@/lib/sheets"
+import { updateBookById } from "@/lib/sheets"
 
 export async function PUT(request: NextRequest) {
   try {
-    const requestData = await request.json()
-    console.log("Update request data:", requestData)
+    const bookData = await request.json()
+    console.log("Update request data:", bookData)
 
-    const { rowIndex, ...bookData } = requestData
-
-    if (typeof rowIndex !== "number") {
-      console.error("Invalid rowIndex:", rowIndex)
+    // Validate that we have an ID
+    if (!bookData.id) {
+      console.error("Missing book ID")
       return NextResponse.json(
-        { error: "Row index is required" },
+        { error: "Book ID is required" },
         { status: 400 }
       )
     }
@@ -25,29 +24,9 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Convert book data to array format matching sheet columns (A:O)
-    const values = [
-      bookData.id || "",
-      bookData.isbn || "",
-      bookData.title || "",
-      bookData.author || "",
-      bookData.type || "",
-      bookData.publisher || "",
-      bookData.year || "",
-      bookData.edition || "",
-      bookData.coverUrl || "",
-      bookData.notes || "",
-      bookData.price || "",
-      bookData.url || "",
-      bookData.language || "",
-      bookData.sellingprice || "",
-      bookData.forsale !== false ? "TRUE" : "FALSE", // Default to TRUE (for sale)
-    ]
+    console.log("Updating book with ID:", bookData.id)
 
-    console.log("Updating sheet with values:", values)
-    console.log("Row index:", rowIndex)
-
-    await updateBook(sheetId, rowIndex, values)
+    await updateBookById(sheetId, bookData.id, bookData)
 
     console.log("Book updated successfully")
     return NextResponse.json({ success: true })
