@@ -92,6 +92,8 @@ export default function EditBookModal({
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [imageSearching, setImageSearching] = useState(false)
+  const [imageSearchResults, setImageSearchResults] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle ESC key to close modal
@@ -170,6 +172,90 @@ export default function EditBookModal({
       setUploadProgress(0)
     }
   }, [])
+
+  const searchImages = async () => {
+    setImageSearching(true)
+    setImageSearchResults([])
+
+    try {
+      // Create a more specific book search query
+      const searchTerms = []
+      if (book.title) searchTerms.push(`"${book.title}"`)
+      if (book.author) searchTerms.push(`"${book.author}"`)
+      if (book.isbn) searchTerms.push(book.isbn)
+
+      // Always include "book cover" to get more relevant results
+      const query = `${searchTerms.join(" ")} book cover`
+
+      const response = await fetch(
+        `/api/search/images?q=${encodeURIComponent(query)}`
+      )
+      const data = await response.json()
+
+      if (data.items && data.items.length > 0) {
+        // Don't upload images yet - just store the URLs for preview
+        setImageSearchResults(
+          data.items.map((item: any) => ({
+            title: item.title,
+            link: item.link, // Original high-res URL
+            thumbnailLink: item.thumbnailLink || item.link, // Thumbnail for preview
+            source: item.source || "Google Images",
+          }))
+        )
+
+        if (data.fallback) {
+          showToast(data.message || "Using fallback image sources", "info")
+        }
+      } else {
+        showToast("No images found", "error")
+      }
+    } catch (error) {
+      console.error("Image search error:", error)
+      showToast("Failed to search for images", "error")
+    } finally {
+      setImageSearching(false)
+    }
+  }
+
+  // New function to handle image selection and upload
+  const selectAndUploadImage = async (imageUrl: string, imageTitle: string) => {
+    setIsUploading(true)
+
+    try {
+      showToast("Downloading and uploading image...", "info")
+
+      // Upload the selected image to UploadThing
+      const uploadResponse = await fetch("/api/upload-image-from-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          fileName: `${book.title || "book"}-cover.jpg`,
+        }),
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload image")
+      }
+
+      const uploadData = await uploadResponse.json()
+
+      // Update the form data with the new UploadThing URL
+      handleInputChange("image", uploadData.url)
+
+      // Clear the search results
+      setImageSearchResults([])
+
+      showToast("Image uploaded successfully!", "success")
+    } catch (error) {
+      console.error("Image upload error:", error)
+      showToast("Failed to upload image", "error")
+    } finally {
+      setIsUploading(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -438,6 +524,49 @@ export default function EditBookModal({
                 For sale (show in public library)
               </span>
             </label>
+          </div>
+
+          {/* Image Search Section */}
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-foreground">
+              Search for Cover Images
+            </label>
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={searchImages}
+                disabled={imageSearching}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {imageSearching ? "Searching..." : "Search Images"}
+              </button>
+
+              {/* Update the image search results display */}
+              {imageSearchResults.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Select an image:</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                    {imageSearchResults.map((result, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={result.thumbnailLink}
+                          alt={result.title}
+                          className="w-full h-24 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() =>
+                            selectAndUploadImage(result.link, result.title)
+                          }
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder-book-cover.jpg"
+                          }}
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="truncate">{result.source}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

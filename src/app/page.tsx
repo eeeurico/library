@@ -867,20 +867,21 @@ function GridView({
                   // Show both prices with strikethrough on original
                   <>
                     <p className="text-muted-foreground line-through">
-                      ${book.price}
+                      {book.price}
                     </p>
                     <p className="font-medium text-green-600">
-                      ${book.sellingprice}
+                      {book.sellingprice}
                     </p>
                   </>
                 ) : book.sellingprice ? (
                   // Show only selling price
                   <p className="font-medium text-green-600">
-                    ${book.sellingprice}
+                    {book.sellingprice}
                   </p>
                 ) : (
                   // Show only original price
-                  <p className="text-muted-foreground">${book.price}</p>
+                  // <p className="text-muted-foreground">{book.price}</p>
+                  <p></p>
                 )}
               </div>
             )}
@@ -932,11 +933,11 @@ function TableView({
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
               ISBN
             </th>
-            {isAuthenticated && (
-              <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
-                Price
-              </th>
-            )}
+
+            <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
+              Price
+            </th>
+
             {isAuthenticated && (
               <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[100px]">
                 Selling Price
@@ -950,9 +951,11 @@ function TableView({
                 Status
               </th>
             )}
+
             <th className="text-left py-4 px-2 font-normal text-sm text-muted-foreground min-w-[80px]">
               Link
             </th>
+
             {isAuthenticated && (
               <th className="text-right py-4 px-2 font-normal text-sm text-muted-foreground min-w-[120px]">
                 Actions
