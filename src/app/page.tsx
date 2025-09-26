@@ -410,8 +410,15 @@ export default function BooksPage() {
       <div className="flex justify-between items-center mb-8 px-6">
         <div>
           <h1 className="text-4xl font-light tracking-tight text-foreground">
-            BookLibrary
+            Books for Sale
           </h1>
+          {/* add contact here */}
+          <a
+            href="mailto:mail@eurico.ws"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            mail@eurico.ws
+          </a>
           <p className="text-muted-foreground mt-2 font-light">
             {books.length} books
           </p>
