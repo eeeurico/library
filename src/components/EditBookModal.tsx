@@ -92,9 +92,29 @@ export default function EditBookModal({
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [imageSearching, setImageSearching] = useState(false)
-  const [imageSearchResults, setImageSearchResults] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // New state for enhanced features
+  const [showImageSearch, setShowImageSearch] = useState(false)
+  const [showPriceSearch, setShowPriceSearch] = useState(false)
+  const [showUrlSearch, setShowUrlSearch] = useState(false)
+  const [imageSearchResults, setImageSearchResults] = useState<string[]>([])
+  const [priceSearchResults, setPriceSearchResults] = useState<
+    Array<{
+      price: string
+      source: string
+      info: string
+      url?: string
+    }>
+  >([])
+  const [urlSearchResults, setUrlSearchResults] = useState<
+    Array<{
+      url: string
+      source: string
+      title: string
+    }>
+  >([])
+  const [isSearching, setIsSearching] = useState(false)
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -115,6 +135,112 @@ export default function EditBookModal({
 
   const handleInputChange = (field: keyof Book, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Search functions for enhanced features
+  const searchImages = async () => {
+    if (!formData.title && !formData.author) {
+      showToast(
+        "Please enter title and/or author to search for images",
+        "error"
+      )
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      // Create a better search query with more specific book terms
+      const queryParts = []
+      if (formData.title) queryParts.push(`"${formData.title}"`)
+      if (formData.author) queryParts.push(`"${formData.author}"`)
+      queryParts.push("book cover")
+
+      const query = queryParts.join(" ")
+      const response = await fetch(
+        `/api/search/images?q=${encodeURIComponent(query)}`
+      )
+
+      if (response.ok) {
+        const results = await response.json()
+        if (results.note) {
+          showToast(results.note, "info")
+        }
+        setImageSearchResults(results.images || [])
+        setShowImageSearch(true)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        showToast(errorData.error || "Failed to search for images", "error")
+      }
+    } catch (error) {
+      console.error("Image search error:", error)
+      showToast("Error searching for images", "error")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const searchPrices = async () => {
+    if (!formData.isbn && !formData.title) {
+      showToast("Please enter ISBN or title to search for prices", "error")
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      // Create a search query from available book information
+      const queryParts = []
+      if (formData.title) queryParts.push(formData.title)
+      if (formData.author) queryParts.push(formData.author)
+      if (formData.isbn) queryParts.push(formData.isbn)
+
+      const query = queryParts.join(" ")
+      const response = await fetch(
+        `/api/search/prices?q=${encodeURIComponent(query)}`
+      )
+
+      if (response.ok) {
+        const results = await response.json()
+        setPriceSearchResults(results.prices || [])
+        setShowPriceSearch(true)
+      } else {
+        showToast("Failed to search for prices", "error")
+      }
+    } catch (error) {
+      console.error("Price search error:", error)
+      showToast("Error searching for prices", "error")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const searchUrls = async () => {
+    if (!formData.isbn && !formData.title) {
+      showToast("Please enter ISBN or title to search for URLs", "error")
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const searchParams = new URLSearchParams()
+      if (formData.isbn) searchParams.append("isbn", formData.isbn)
+      if (formData.title) searchParams.append("title", formData.title)
+      if (formData.author) searchParams.append("author", formData.author)
+
+      const response = await fetch(`/api/search/urls?${searchParams}`)
+
+      if (response.ok) {
+        const results = await response.json()
+        setUrlSearchResults(results.urls || [])
+        setShowUrlSearch(true)
+      } else {
+        showToast("Failed to search for URLs", "error")
+      }
+    } catch (error) {
+      console.error("URL search error:", error)
+      showToast("Error searching for URLs", "error")
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleSave = async () => {
@@ -173,90 +299,6 @@ export default function EditBookModal({
     }
   }, [])
 
-  const searchImages = async () => {
-    setImageSearching(true)
-    setImageSearchResults([])
-
-    try {
-      // Create a more specific book search query
-      const searchTerms = []
-      if (book.title) searchTerms.push(`"${book.title}"`)
-      if (book.author) searchTerms.push(`"${book.author}"`)
-      if (book.isbn) searchTerms.push(book.isbn)
-
-      // Always include "book cover" to get more relevant results
-      const query = `${searchTerms.join(" ")} book cover`
-
-      const response = await fetch(
-        `/api/search/images?q=${encodeURIComponent(query)}`
-      )
-      const data = await response.json()
-
-      if (data.items && data.items.length > 0) {
-        // Don't upload images yet - just store the URLs for preview
-        setImageSearchResults(
-          data.items.map((item: any) => ({
-            title: item.title,
-            link: item.link, // Original high-res URL
-            thumbnailLink: item.thumbnailLink || item.link, // Thumbnail for preview
-            source: item.source || "Google Images",
-          }))
-        )
-
-        if (data.fallback) {
-          showToast(data.message || "Using fallback image sources", "info")
-        }
-      } else {
-        showToast("No images found", "error")
-      }
-    } catch (error) {
-      console.error("Image search error:", error)
-      showToast("Failed to search for images", "error")
-    } finally {
-      setImageSearching(false)
-    }
-  }
-
-  // New function to handle image selection and upload
-  const selectAndUploadImage = async (imageUrl: string, imageTitle: string) => {
-    setIsUploading(true)
-
-    try {
-      showToast("Downloading and uploading image...", "info")
-
-      // Upload the selected image to UploadThing
-      const uploadResponse = await fetch("/api/upload-image-from-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: imageUrl,
-          fileName: `${book.title || "book"}-cover.jpg`,
-        }),
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload image")
-      }
-
-      const uploadData = await uploadResponse.json()
-
-      // Update the form data with the new UploadThing URL
-      handleInputChange("image", uploadData.url)
-
-      // Clear the search results
-      setImageSearchResults([])
-
-      showToast("Image uploaded successfully!", "success")
-    } catch (error) {
-      console.error("Image upload error:", error)
-      showToast("Failed to upload image", "error")
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
   if (!isOpen) return null
 
   return (
@@ -303,6 +345,68 @@ export default function EditBookModal({
                 </div>
               )}
               <div className="flex-1">
+                <div className="flex gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={searchImages}
+                    disabled={isSearching}
+                    className="px-3 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {isSearching ? "Searching..." : "Search Images"}
+                  </button>
+                  {formData.coverUrl && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, coverUrl: "" }))
+                      }
+                      className="px-3 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:border-white transition-colors rounded-sm"
+                    >
+                      Clear Image
+                    </button>
+                  )}
+                </div>
+
+                {showImageSearch && (
+                  <div className="mb-4 p-4 border border-border rounded-sm bg-muted/30">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium">Search Results</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowImageSearch(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                      {imageSearchResults.map((imageUrl, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              coverUrl: imageUrl,
+                            }))
+                            setShowImageSearch(false)
+                          }}
+                          className="aspect-[3/4] border border-border rounded overflow-hidden hover:ring-2 hover:ring-blue-500"
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={`Cover option ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none"
+                            }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <UploadDropzone<OurFileRouter, "bookCoverUploader">
                   endpoint="bookCoverUploader"
                   onClientUploadComplete={(res) => {
@@ -429,13 +533,81 @@ export default function EditBookModal({
               <label className="block text-sm font-medium text-foreground mb-2">
                 Price
               </label>
-              <input
-                type="text"
-                value={formData.price || ""}
-                onChange={(e) => handleInputChange("price", e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
-                placeholder="€19.99"
-              />
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.price || ""}
+                    onChange={(e) => handleInputChange("price", e.target.value)}
+                    className="flex-1 px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                    placeholder="€19.99"
+                  />
+                  <button
+                    type="button"
+                    onClick={searchPrices}
+                    disabled={isSearching}
+                    className="px-3 py-2 text-sm bg-green-600 text-white hover:bg-green-700 transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {isSearching ? "..." : "Search"}
+                  </button>
+                </div>
+
+                {showPriceSearch && (
+                  <div className="p-4 border border-border rounded-sm bg-muted/30">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium">Price Options</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowPriceSearch(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {priceSearchResults.map((result, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              price: result.price,
+                            }))
+                            setShowPriceSearch(false)
+                          }}
+                          className="w-full text-left p-3 border border-border rounded hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-green-600">
+                                {result.price}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {result.source}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {result.info}
+                              </div>
+                            </div>
+                            {result.url && (
+                              <a
+                                href={result.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-blue-500 hover:text-blue-600 text-xs"
+                              >
+                                View
+                              </a>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -480,13 +652,79 @@ export default function EditBookModal({
               <label className="block text-sm font-medium text-foreground mb-2">
                 URL
               </label>
-              <input
-                type="url"
-                value={formData.url || ""}
-                onChange={(e) => handleInputChange("url", e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
-                placeholder="https://..."
-              />
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.url || ""}
+                    onChange={(e) => handleInputChange("url", e.target.value)}
+                    className="flex-1 px-3 py-2 border border-border rounded-sm bg-background text-foreground focus:outline-none focus:border-white transition-colors"
+                    placeholder="https://..."
+                  />
+                  <button
+                    type="button"
+                    onClick={searchUrls}
+                    disabled={isSearching}
+                    className="px-3 py-2 text-sm bg-orange-600 text-white hover:bg-orange-700 transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {isSearching ? "..." : "Find"}
+                  </button>
+                </div>
+
+                {showUrlSearch && (
+                  <div className="p-4 border border-border rounded-sm bg-muted/30">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium">URL Options</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlSearch(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {urlSearchResults.map((result, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              url: result.url,
+                            }))
+                            setShowUrlSearch(false)
+                          }}
+                          className="w-full text-left p-3 border border-border rounded hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-blue-600 truncate">
+                                {result.title}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {result.source}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1 truncate">
+                                {result.url}
+                              </div>
+                            </div>
+                            <a
+                              href={result.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-blue-500 hover:text-blue-600 text-xs ml-2"
+                            >
+                              Visit
+                            </a>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -524,49 +762,6 @@ export default function EditBookModal({
                 For sale (show in public library)
               </span>
             </label>
-          </div>
-
-          {/* Image Search Section */}
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-foreground">
-              Search for Cover Images
-            </label>
-            <div className="flex flex-col space-y-2">
-              <button
-                onClick={searchImages}
-                disabled={imageSearching}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {imageSearching ? "Searching..." : "Search Images"}
-              </button>
-
-              {/* Update the image search results display */}
-              {imageSearchResults.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Select an image:</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                    {imageSearchResults.map((result, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={result.thumbnailLink}
-                          alt={result.title}
-                          className="w-full h-24 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() =>
-                            selectAndUploadImage(result.link, result.title)
-                          }
-                          onError={(e) => {
-                            e.currentTarget.src = "/placeholder-book-cover.jpg"
-                          }}
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="truncate">{result.source}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
